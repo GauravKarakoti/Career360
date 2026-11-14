@@ -12,6 +12,7 @@ model Account {
   email            String      @unique
   passwordHash     String
   recoveryCodeHash String
+  primaryRole      String?
   createdAt        DateTime    @default(now())
   workspaces       Workspace[]
 }

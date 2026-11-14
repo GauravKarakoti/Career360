@@ -17,7 +17,20 @@ export async function workspace(create = false) {
   jar.set(cookieName, raw, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', expires: expiresAt });
   return record;
 }
-export async function clearSession() { (await cookies()).delete(cookieName); }
+export async function clearSession() {
+  (await cookies()).set(cookieName, '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', expires: new Date(0) });
+}
+export async function signedInAccount(): Promise<{ id: string; email: string; primaryRole: string | null } | null> {
+  const jar = await cookies();
+  const token = jar.get(cookieName)?.value;
+  if (!token) return null;
+  const record = await db().workspace.findUnique({
+    where: { tokenHash: createHash('sha256').update(token).digest('hex') },
+    select: { account: { select: { id: true, email: true, primaryRole: true } } },
+  });
+  if (!record || !record.account) return null;
+  return record.account;
+}
 export class ApiError extends Error {
   constructor(message: string, public status = 400) { super(message); }
 }

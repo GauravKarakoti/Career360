@@ -17,6 +17,7 @@ export async function POST(request: Request) {
         email: input.email,
         passwordHash: await hashSecret(input.password),
         recoveryCodeHash: recoveryCodeHash(recoveryCode),
+        primaryRole: input.role,
         workspaces: { connect: { id: current.id } }
       }
     });

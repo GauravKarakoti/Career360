@@ -27,11 +27,9 @@ type WorkspaceContextValue = {
   opportunities: Opportunity[];
   load: () => Promise<void>;
   refreshOpportunities: (query?: string) => Promise<void>;
-  resetWorkspace: () => Promise<void>;
+  primaryRole: string | null;
   signOut: () => Promise<void>;
   addTracker: (opportunity: Opportunity) => Promise<void>;
-  showAuth: boolean;
-  setShowAuth: (value: boolean) => void;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -47,11 +45,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  const [showAuth, setShowAuth] = useState(false);
+  const [primaryRole, setPrimaryRole] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const ws = await api<{ profile: Profile | null; saved: { opportunityId: string }[]; email: string | null }>('/api/workspace');
+      const ws = await api<{ profile: Profile | null; saved: { opportunityId: string }[]; email: string | null; primaryRole: string | null }>('/api/workspace');
       const feed = await api<{ opportunities: Opportunity[] }>('/api/opportunities');
       if (ws.profile) {
         const p = ws.profile;
@@ -61,8 +59,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           needs: p.needs.map(item => item.label).join(', '),
         });
         setHasProfile(true);
+      } else if (ws.primaryRole) {
+        setProfileForm(previous => ({ ...previous, role: ws.primaryRole ?? previous.role }));
       }
       setEmail(ws.email);
+      setPrimaryRole(ws.primaryRole);
       setSavedIds(new Set(ws.saved.map(entry => entry.opportunityId)));
       setOpportunities(feed.opportunities);
     } catch (caught) {
@@ -127,28 +128,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const resetWorkspace = useCallback(async () => {
-    if (!window.confirm('Reset this private workspace? Your DNA, saved items and listings are deleted.')) return;
-    try {
-      await api('/api/workspace', { method: 'DELETE' });
-      setProfileForm(EMPTY_FORM); setHasProfile(false); setSavedIds(new Set()); setEmail(null);
-      await load();
-      flash('Workspace reset. A fresh private session has started.');
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not reset your workspace.');
-    }
-  }, [load, flash]);
-
   const signOut = useCallback(async () => {
     try {
       await api('/api/auth/sign-out', { method: 'POST' });
-      setEmail(null);
-      await load();
-      flash(tr(lang, 'Signed out. This guest session starts fresh.', 'साइन आउट। यह अतिथि सत्र नया शुरू होता है।'));
+      window.location.assign('/');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not sign out.');
     }
-  }, [lang, load, flash]);
+  }, []);
 
   const addTracker = useCallback(async (opportunity: Opportunity) => {
     try {
@@ -165,15 +152,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<WorkspaceContextValue>(() => ({
     loading, error, notice, setError, flash,
     lang, setLang, t: (en, hi) => tr(lang, en, hi),
-    email,
+    email, primaryRole,
     savedIds, savedCount: savedIds.size, toggleSave,
     profileForm, setProfileForm, hasProfile, savingProfile, saveProfile,
     opportunities, load, refreshOpportunities,
-    resetWorkspace, signOut, addTracker,
-    showAuth, setShowAuth,
-  }), [loading, error, notice, flash, lang, email, savedIds, toggleSave, profileForm,
+    signOut, addTracker,
+  }), [loading, error, notice, flash, lang, email, primaryRole, savedIds, toggleSave, profileForm,
     hasProfile, savingProfile, saveProfile, opportunities, load, refreshOpportunities,
-    resetWorkspace, signOut, addTracker, showAuth]);
+    signOut, addTracker]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

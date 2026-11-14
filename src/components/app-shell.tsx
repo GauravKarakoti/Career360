@@ -3,14 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  AlertCircle, CheckCircle2, Compass, Dna, Loader2, MessagesSquare,
-  Radar, RotateCcw, Users,
+  AlertCircle, CheckCircle2, Dna, LayoutDashboard, Loader2, MessagesSquare,
+  Radar, Users,
 } from 'lucide-react';
 import { useWorkspace } from '@/components/workspace-context';
-import { AuthPanel } from '@/components/auth-panel';
 
 const NAV = [
-  { href: '/', label: 'Overview', icon: Compass },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dna', label: 'Opportunity DNA', icon: Dna },
   { href: '/discover', label: 'Discover', icon: Radar },
   { href: '/connections', label: 'Connections', icon: MessagesSquare },
@@ -21,8 +20,8 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
-    loading, error, notice, setError, lang, setLang, t,
-    email, savedCount, signOut, resetWorkspace, showAuth, setShowAuth,
+    loading, error, notice, lang, setLang, t,
+    email, primaryRole, signOut,
   } = useWorkspace();
 
   if (loading) {
@@ -38,7 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href="/" className="flex items-center gap-3">
+            <Link href="/dashboard" className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white">
                 <Dna aria-hidden className="h-5 w-5" />
               </span>
@@ -47,12 +46,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="block text-xs text-slate-500">From information to opportunity to action</span>
               </span>
             </Link>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className="text-xs text-slate-500">
-                {email
-                  ? t('Signed in as', 'साइन इन:') + ` ${email} · ${savedCount} ${t('saved', 'सहेजे')}`
-                  : t('Private guest session', 'निजी अतिथि सत्र') + ` · ${savedCount} ${t('saved', 'सहेजे')}`}
-              </span>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {email && (
+                <span className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className="max-w-[16rem] truncate">{email}</span>
+                  {primaryRole && (
+                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
+                      {primaryRole}
+                    </span>
+                  )}
+                </span>
+              )}
               <button type="button" onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
                 className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50" aria-label="Switch language">
                 {lang === 'en' ? 'हिंदी' : 'English'}
@@ -63,22 +67,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {t('Sign out', 'साइन आउट')}
                 </button>
               ) : (
-                <button type="button" onClick={() => setShowAuth(!showAuth)} aria-expanded={showAuth}
+                <Link href="/signin"
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
-                  {t('Account', 'खाता')}
-                </button>
+                  {t('Sign in', 'साइन इन')}
+                </Link>
               )}
-              <button type="button" onClick={resetWorkspace}
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-                <RotateCcw aria-hidden className="h-4 w-4" /> {t('Reset', 'रीसेट')}
-              </button>
             </div>
           </div>
-          {showAuth && !email && (
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <AuthPanel lang={lang} onAuthed={async () => setShowAuth(false)} onError={setError} />
-            </div>
-          )}
           <nav aria-label="Main" className="mt-3 flex gap-1 overflow-x-auto pb-1">
             {NAV.map(entry => {
               const active = pathname === entry.href;
@@ -113,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <footer className="mt-10 border-t border-slate-200 bg-white py-6">
         <p className="mx-auto max-w-6xl px-4 text-center text-xs text-slate-500 sm:px-6">
-          Demo listings are explicitly fictional and labelled. User submissions are unverified. Your data stays in a private guest session.
+          Demo listings are explicitly fictional and labelled. User submissions are unverified. Your workspace is private to your account.
         </p>
       </footer>
     </div>
