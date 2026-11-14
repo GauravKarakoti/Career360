@@ -1,0 +1,22 @@
+{
+  "connections.privacyNotice": "Only discoverable profiles can be contacted. Private senders appear as “Private profile”.",
+  "connections.title": "Connections",
+  "dashboard.open": "Open",
+  "discover.savedCount": "{count, plural, =0 {no saves yet} one {Saved (#)} other {Saved (#)}}",
+  "discover.searchNote": "Ranked full-text search runs on the server; filters apply client-side.",
+  "discover.title": "Discover",
+  "dna.intro": "Describe what you offer and what you need. Matching is rule-based and fully transparent.",
+  "dna.title": "Your Opportunity DNA",
+  "orgs.adminKey": "Admin key (shown once):",
+  "orgs.create": "Create an organization",
+  "orgs.intro": "Create an organization, add members, verify it with the admin key and keep secure documents with a full audit trail.",
+  "orgs.namePlaceholder": "Organization name",
+  "orgs.title": "Organizations",
+  "pulse.intro": "Counts from your own workspace over the last 30 days. Nothing here is estimated or predicted.",
+  "pulse.title": "Market Pulse",
+  "shell.loading": "Loading your workspace…",
+  "shell.signIn": "Sign in",
+  "shell.signOut": "Sign out",
+  "trackers.intro": "Track applications and leads from first save to a closed outcome.",
+  "trackers.title": "Trackers"
+}

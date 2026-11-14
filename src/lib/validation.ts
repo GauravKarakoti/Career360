@@ -3,6 +3,7 @@ export const roles = ['Startup', 'Candidate', 'Recruiter', 'Creator', 'Business'
 export const categories = ['Partnerships', 'Funding', 'Jobs & internships', 'Events', 'Collaborations', 'Learning'] as const;
 const text = z.string().trim().min(1).max(160);
 const terms = z.array(z.string().trim().min(1).max(80)).min(1).max(20).transform(items => [...new Map(items.map(item => [item.toLocaleLowerCase(), item])).values()]);
+const preferredTerms = z.array(z.string().trim().min(1).max(80)).max(20).optional().transform(items => [...new Map((items ?? []).map(item => [item.toLocaleLowerCase(), item])).values()]);
 const email = z.string().trim().toLowerCase().email().max(200);
 const password = z.string().min(8).max(200);
 export const signUpInput = z.object({ email, password, role: z.enum(roles) });
@@ -19,6 +20,7 @@ export const profileInput = z.object({
 export const opportunityInput = z.object({
   title: text, organization: text, category: z.enum(categories), location: text, industry: text,
   description: z.string().trim().min(20).max(2000), requirements: terms, offers: terms,
+  preferred: preferredTerms,
   sourceUrl: z.string().url().max(2000).refine(value => new URL(value).protocol === 'https:', 'Use an HTTPS source URL.').nullable(),
   evidence: z.array(z.object({ field: z.string().max(80), quote: z.string().max(1000) })).max(10).nullable(),
   deadline: z.string().datetime().nullable(),

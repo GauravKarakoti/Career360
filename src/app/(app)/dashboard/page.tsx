@@ -137,7 +137,7 @@ export default function DashboardPage() {
             <h2 className="mt-3 text-base font-semibold text-slate-900">{entry.title}</h2>
             <p className="mt-1 flex-1 text-sm leading-relaxed text-slate-600">{entry.body}</p>
             <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 group-hover:underline">
-              {t('Open', 'खोलें')} <ChevronRight aria-hidden className="h-4 w-4" />
+              {t('dashboard.open')} <ChevronRight aria-hidden className="h-4 w-4" />
             </span>
           </Link>
         ))}

@@ -46,6 +46,7 @@ export default function DiscoverPage() {
         body: JSON.stringify({
           ...listingForm,
           requirements: splitTerms(listingForm.requirements),
+          preferred: splitTerms(listingForm.preferred),
           offers: splitTerms(listingForm.offers),
           sourceUrl: listingForm.sourceUrl || null,
           evidence: draft ? draft.evidence : null,
@@ -72,7 +73,8 @@ export default function DiscoverPage() {
         ...EMPTY_LISTING,
         title: result.draft.title, organization: result.draft.organization, category: result.draft.category,
         location: result.draft.location, industry: result.draft.industry, description: result.draft.description,
-        requirements: result.draft.requirements.join(', '), offers: result.draft.offers.join(', '),
+        requirements: result.draft.requirements.join(', '), preferred: (result.draft.preferred ?? []).join(', '),
+        offers: result.draft.offers.join(', '),
         sourceUrl: result.draft.sourceUrl,
       });
       setShowListingForm(true);
@@ -87,7 +89,7 @@ export default function DiscoverPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Compass aria-hidden className="h-5 w-5 text-brand-600" />
-          <h1 className="text-xl font-bold text-slate-900">{t('Discover', 'खोजें')}</h1>
+          <h1 className="text-xl font-bold text-slate-900">{t('discover.title')}</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select aria-label="Filter by category" value={category}
@@ -100,7 +102,7 @@ export default function DiscoverPage() {
             className={`rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset ${
               savedOnly ? 'bg-brand-50 text-brand-700 ring-brand-300' : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50'
             }`}>
-            {t('Saved', 'सहेजे')} ({savedCount})
+            {t('discover.savedCount', { count: savedCount })}
           </button>
           <button type="button" onClick={() => setShowListingForm(value => !value)} aria-expanded={showListingForm}
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700">
@@ -208,6 +210,12 @@ export default function DiscoverPage() {
             </div>
           </div>
           <div>
+            <label htmlFor="l-preferred" className={labelClass}>Preferred (optional, comma-separated — nice to have, not scored as mandatory)</label>
+            <input id="l-preferred" value={listingForm.preferred}
+              onChange={event => setListingForm(f => ({ ...f, preferred: event.target.value }))}
+              className={fieldClass} placeholder="Prior startup experience" />
+          </div>
+          <div>
             <label htmlFor="l-source" className={labelClass}>Source URL (optional, HTTPS)</label>
             <input id="l-source" type="url" value={listingForm.sourceUrl}
               onChange={event => setListingForm(f => ({ ...f, sourceUrl: event.target.value }))}
@@ -239,7 +247,7 @@ export default function DiscoverPage() {
       </div>
 
       <p className="mt-6 flex items-center gap-2 text-xs text-slate-500">
-        <Radar aria-hidden className="h-3.5 w-3.5" /> {lang === 'en' ? 'Ranked full-text search runs on the server; filters apply client-side.' : 'रैंक की गई खोज सर्वर पर चलती है; फ़िल्टर क्लाइंट-साइड लागू होते हैं।'}
+        <Radar aria-hidden className="h-3.5 w-3.5" /> {t('discover.searchNote')}
       </p>
     </main>
   );

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   api, splitTerms, EMPTY_FORM, t as tr,
-  type Lang, type Opportunity, type Profile, type ProfileForm,
+  type Lang, type MsgKey, type Opportunity, type Profile, type ProfileForm,
 } from '@/lib/client-api';
 
 type WorkspaceContextValue = {
@@ -14,7 +14,7 @@ type WorkspaceContextValue = {
   flash: (message: string) => void;
   lang: Lang;
   setLang: (lang: Lang) => void;
-  t: (en: string, hi: string) => string;
+  t: (key: MsgKey, vars?: { count?: number }) => string;
   email: string | null;
   savedIds: Set<string>;
   savedCount: number;
@@ -151,7 +151,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<WorkspaceContextValue>(() => ({
     loading, error, notice, setError, flash,
-    lang, setLang, t: (en, hi) => tr(lang, en, hi),
+    lang, setLang, t: (key, vars) => tr(lang, key, vars),
     email, primaryRole,
     savedIds, savedCount: savedIds.size, toggleSave,
     profileForm, setProfileForm, hasProfile, savingProfile, saveProfile,

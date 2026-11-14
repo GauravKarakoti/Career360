@@ -152,13 +152,10 @@ export default function ConnectionsPage() {
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <div className="flex items-center gap-2">
         <MessagesSquare aria-hidden className="h-5 w-5 text-brand-600" />
-        <h1 className="text-xl font-bold text-slate-900">{t('Connections', 'कनेक्शन')}</h1>
+        <h1 className="text-xl font-bold text-slate-900">{t('connections.title')}</h1>
       </div>
       <p className="mt-1 max-w-2xl text-sm text-slate-500">
-        {t(
-          'Only discoverable profiles can be contacted. Private senders appear as “Private profile”.',
-          'केवल खोजे जा सकने वाले प्रोफ़ाइल से संपर्क किया जा सकता है। निजी भेजने वाले “Private profile” दिखते हैं।'
-        )}
+        {t('connections.privacyNotice')}
       </p>
 
       <form

@@ -46,10 +46,10 @@ Acceptance: save a startup DNA through the UI, reload to recover it from Postgre
 
 ## Phase 2: Authenticated multilingual intelligence
 Connect identity, confirmed AI extraction and bilingual intelligence without overstating evidence.
-- [ ] Add recoverable authenticated accounts, multi-role selection and consent-based profile visibility.
-- [ ] Integrate configurable LLM/embedding providers with structured outputs, confirmation and English/Hindi/Hinglish interactions.
-- [ ] Add source ingestion, evidence comparisons and mandatory/preferred gap bridges with real learning sources.
-- [ ] Implement recipient-owned accept/decline connection requests and activity transitions.
+- [x] Add recoverable authenticated accounts, multi-role selection and consent-based profile visibility.
+- [x] Integrate configurable LLM/embedding providers with structured outputs, confirmation and English/Hindi/Hinglish interactions.
+- [x] Add source ingestion, evidence comparisons and mandatory/preferred gap bridges with real learning sources.
+- [x] Implement recipient-owned accept/decline connection requests and activity transitions.
 Acceptance: a startup and candidate can use the specified multilingual MVP flows against real or clearly labeled demo opportunities, with source evidence and real connection recipients.
 
 ## Phase 3: Collaboration and source-backed impact

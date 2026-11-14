@@ -20,6 +20,7 @@ type AuditEntry = { id: string; action: string; detail: string; createdAt: strin
 
 export default function OrganizationsPage() {
   const { lang } = useWorkspace();
+  const t = (key: MsgKey, vars?: { count?: number }) => tr(lang, key, vars);
   const [orgs, setOrgs] = useState<OrgCard[]>([]);
   const [selected, setSelected] = useState<{ org: OrgDetail; role: string | null } | null>(null);
   const [audit, setAudit] = useState<AuditEntry[] | null>(null);
@@ -69,20 +70,17 @@ export default function OrganizationsPage() {
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
         <Building2 aria-hidden className="h-6 w-6 text-brand-600" />
-        {tr(lang, 'Organizations', 'संगठन', 'संस्था')}
+        {t('orgs.title')}
       </h1>
       <p className="mt-1 text-sm text-slate-600">
-        {tr(lang,
-          'Create an organization, add members, verify it with the admin key and keep secure documents with a full audit trail.',
-          'संगठन बनाएं, सदस्य जोड़ें, एडमिन की से सत्यापित करें और सुरक्षित दस्तावेज़ रखें।',
-          'संस्था तयार करा, सदस्य जोडा, ॲडमिन कीने पडताळा आणि सुरक्षित दस्तऐवज ठेवा.')}
+        {t('orgs.intro')}
       </p>
 
       {error && <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-inset ring-red-200">{error}</p>}
       {notice && <p role="status" className="mt-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-200">{notice}</p>}
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-slate-900">{tr(lang, 'Create an organization', 'संगठन बनाएं', 'संस्था तयार करा')}</h2>
+        <h2 className="text-sm font-semibold text-slate-900">{t('orgs.create')}</h2>
         <form className="mt-3 flex flex-col gap-2 sm:flex-row"
           onSubmit={(e) => { e.preventDefault(); void run(async () => {
             const data = await api<{ organization: OrgCard; adminKey: string }>('/api/organizations', {
@@ -93,7 +91,7 @@ export default function OrganizationsPage() {
             return 'Organization created. Save the admin key shown below — verification needs it.';
           }); }}>
           <input required minLength={2} value={newName} onChange={(e) => setNewName(e.target.value)}
-            placeholder={tr(lang, 'Organization name', 'संगठन का नाम', 'संस्थेचे नाव')}
+            placeholder={t('orgs.namePlaceholder')}
             className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
           <input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Short description (optional)"
             className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm" />
@@ -103,7 +101,7 @@ export default function OrganizationsPage() {
         </form>
         {adminKey && (
           <p className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
-            {tr(lang, 'Admin key (shown once):', 'एडमिन की (एक बार दिखाई गई):', 'ॲडमिन की (एकदाच दाखवली):')}{' '}
+            {t('orgs.adminKey')}{' '}
             <code className="break-all font-mono font-semibold">{adminKey}</code>
           </p>
         )}

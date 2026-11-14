@@ -8,7 +8,7 @@ const input = z.object({ url: z.string().url().max(2000).refine(value => new URL
 
 type Extraction = {
   title: string; organization: string; category: string; location: string; industry: string;
-  description: string; requirements: string[]; offers: string[];
+  description: string; requirements: string[]; preferred: string[]; offers: string[];
   evidence: { field: string; quote: string }[]; confidence: 'high' | 'medium' | 'low';
 };
 const extractionSchema = schemaOf({
@@ -19,13 +19,14 @@ const extractionSchema = schemaOf({
   industry: { type: 'string' },
   description: { type: 'string' },
   requirements: { type: 'array', items: { type: 'string' } },
+  preferred: { type: 'array', items: { type: 'string' } },
   offers: { type: 'array', items: { type: 'string' } },
   evidence: {
     type: 'array',
     items: schemaOf({ field: { type: 'string' }, quote: { type: 'string' } }, ['field', 'quote'])
   },
   confidence: { type: 'string', enum: ['high', 'medium', 'low'] }
-}, ['title', 'organization', 'category', 'location', 'industry', 'description', 'requirements', 'offers', 'evidence', 'confidence']);
+}, ['title', 'organization', 'category', 'location', 'industry', 'description', 'requirements', 'preferred', 'offers', 'evidence', 'confidence']);
 
 export async function POST(request: Request) {
 
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
         industry: extraction.industry.slice(0, 160),
         description: extraction.description.slice(0, 2000),
         requirements: extraction.requirements.slice(0, 20),
+        preferred: (extraction.preferred ?? []).slice(0, 20),
         offers: extraction.offers.slice(0, 20),
         sourceUrl: url,
         evidence: extraction.evidence.slice(0, 10),

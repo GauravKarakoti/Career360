@@ -140,6 +140,7 @@ model Opportunity {
   industry     String
   description  String
   requirements String[]
+  preferred    String[]  @default([])
   offers       String[]
   sourceUrl    String?
   evidence     Json?

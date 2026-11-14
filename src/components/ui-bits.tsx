@@ -7,16 +7,17 @@ import type { MatchResult, Opportunity } from '@/lib/client-api';
 export const fieldClass = 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500';
 export const labelClass = 'block text-sm font-medium text-slate-700';
 
-export function Chip({ label, tone }: { label: string; tone: 'offer' | 'need' | 'gap' }) {
+export function Chip({ label, tone }: { label: string; tone: 'offer' | 'need' | 'gap' | 'preferred' }) {
   const tones = {
     offer: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
     need: 'bg-sky-50 text-sky-700 ring-sky-200',
     gap: 'bg-amber-50 text-amber-700 ring-amber-200',
+    preferred: 'bg-slate-100 text-slate-600 ring-slate-300',
   } as const;
   return <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${tones[tone]}`}>{label}</span>;
 }
 
-export function MatchPanel({ match }: { match: MatchResult }) {
+export function MatchPanel({ match, evidence }: { match: MatchResult; evidence?: { field: string; quote: string }[] | null }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70">
@@ -41,8 +42,47 @@ export function MatchPanel({ match }: { match: MatchResult }) {
           </div>
           {match.missing.length > 0 && (
             <div>
-              <p className="font-semibold text-slate-700">Gaps to bridge</p>
-              <div className="mt-1 flex flex-wrap gap-1.5">{match.missing.map(item => <Chip key={item} label={item} tone="gap" />)}</div>
+              <p className="font-semibold text-slate-700">Gaps to bridge (required)</p>
+              <ul className="mt-1 space-y-1">
+                {match.bridges.map(bridge => (
+                  <li key={bridge.topic} className="flex flex-wrap items-center gap-1.5">
+                    <Chip label={bridge.topic} tone="gap" />
+                    <a href={bridge.url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-medium text-brand-700 hover:underline">
+                      Learn free on {bridge.label} <ExternalLink aria-hidden className="h-3 w-3" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {match.missingPreferred.length > 0 && (
+            <div>
+              <p className="font-semibold text-slate-700">Preferred (nice to have — not scored)</p>
+              <ul className="mt-1 space-y-1">
+                {match.preferredBridges.map(bridge => (
+                  <li key={bridge.topic} className="flex flex-wrap items-center gap-1.5">
+                    <Chip label={bridge.topic} tone="preferred" />
+                    <a href={bridge.url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-medium text-slate-600 hover:underline">
+                      Learn free on {bridge.label} <ExternalLink aria-hidden className="h-3 w-3" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {evidence && evidence.length > 0 && (
+            <div>
+              <p className="font-semibold text-slate-700">Evidence from the source page</p>
+              <dl className="mt-1 space-y-1">
+                {evidence.map(item => (
+                  <div key={item.field} className="rounded-md bg-white px-2 py-1.5 ring-1 ring-inset ring-slate-200">
+                    <dt className="font-medium text-slate-700">{item.field}</dt>
+                    <dd className="mt-0.5 italic text-slate-500">“{item.quote}”</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
           )}
           <p className="text-slate-500">
@@ -92,8 +132,14 @@ export function OpportunityCard({ item, saved, onToggleSave, onTrack }: {
           <span className="text-xs font-semibold text-sky-700">Looking for:</span>
           {item.requirements.map(label => <Chip key={label} label={label} tone="need" />)}
         </div>
+        {item.preferred?.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-500">Preferred:</span>
+            {item.preferred.map(label => <Chip key={label} label={label} tone="preferred" />)}
+          </div>
+        )}
       </div>
-      {item.match && <MatchPanel match={item.match} />}
+      {item.match && <MatchPanel match={item.match} evidence={item.evidence} />}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => onToggleSave(item.id)} aria-pressed={saved}
           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition ${

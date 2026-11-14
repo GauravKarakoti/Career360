@@ -1,0 +1,14 @@
+{
+  "connections.privacyNotice": "फक्त शोधण्यायोग्य प्रोफाइलशी संपर्क करता येतो. खाजगी पाठवणारे “Private profile” दिसतात.",
+  "connections.title": "कनेक्शन",
+  "discover.savedCount": "{count, plural, =0 {अजून काही साठवले नाही} one {साठवले (#)} other {साठवले (#)}}",
+  "discover.title": "शोध",
+  "dna.title": "तुमची अवॉर्ट्यूनिटी DNA",
+  "orgs.adminKey": "ॲडमिन की (एकदाच दाखवली):",
+  "orgs.create": "संस्था तयार करा",
+  "orgs.intro": "संस्था तयार करा, सदस्य जोडा, ॲडमिन कीने पडताळा आणि सुरक्षित दस्तऐवज ठेवा.",
+  "orgs.namePlaceholder": "संस्थेचे नाव",
+  "orgs.title": "संस्था",
+  "pulse.title": "मार्केट पल्स",
+  "trackers.title": "ट्रॅकर"
+}

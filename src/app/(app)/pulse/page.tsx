@@ -20,10 +20,9 @@ export default function PulsePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-      <h1 className="text-xl font-bold text-slate-900">{t('Market Pulse', 'मार्केट पल्स')}</h1>
+      <h1 className="text-xl font-bold text-slate-900">{t('pulse.title')}</h1>
       <p className="mt-1 max-w-2xl text-sm text-slate-500">
-        {t('Counts from your own workspace over the last 30 days. Nothing here is estimated or predicted.',
-          'पिछले 30 दिनों में आपके वर्कस्पेस की गिनती। यहाँ कुछ भी अनुमानित नहीं है।')}
+        {t('pulse.intro')}
       </p>
       {loading ? (
         <p className="mt-6 flex items-center gap-2 text-sm text-slate-500"><Loader2 aria-hidden className="h-4 w-4 animate-spin" /> Loading…</p>

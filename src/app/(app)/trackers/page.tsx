@@ -32,11 +32,10 @@ export default function TrackersPage() {
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <div className="flex items-center gap-2">
         <Users aria-hidden className="h-5 w-5 text-brand-600" />
-        <h1 className="text-xl font-bold text-slate-900">{t('Trackers', 'ट्रैकर')}</h1>
+        <h1 className="text-xl font-bold text-slate-900">{t('trackers.title')}</h1>
       </div>
       <p className="mt-1 max-w-2xl text-sm text-slate-500">
-        {t('Track applications and leads from first save to a closed outcome.',
-          'पहली सहेजी गई प्रविष्टि से अंतिम परिणाम तक आवेदन और लीड ट्रैक करें।')}
+        {t('trackers.intro')}
       </p>
       <p className="mt-2 text-xs text-slate-500">Stages: identified → applied → in conversation → committed → closed.</p>
 

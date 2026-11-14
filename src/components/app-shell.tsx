@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center gap-3 text-slate-500">
-        <Loader2 aria-hidden className="h-5 w-5 animate-spin" /> {t('Loading your workspace…', 'आपका वर्कस्पेस लोड हो रहा है…')}
+        <Loader2 aria-hidden className="h-5 w-5 animate-spin" /> {t('shell.loading')}
       </div>
     );
   }
@@ -66,12 +66,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {email ? (
                 <button type="button" onClick={signOut}
                   className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-                  {t('Sign out', 'साइन आउट')}
+                  {t('shell.signOut')}
                 </button>
               ) : (
                 <Link href="/signin"
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
-                  {t('Sign in', 'साइन इन')}
+                  {t('shell.signIn')}
                 </Link>
               )}
             </div>
