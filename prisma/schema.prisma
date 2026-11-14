@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model Workspace {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  profile Profile?
+  saved SavedOpportunity[]
+  listings Opportunity[]
+}
+model Profile {
+  id String @id @default(cuid())
+  workspaceId String @unique
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name String
+  role String
+  industry String
+  location String
+  description String
+  stage String @default("")
+  interests String @default("")
+  constraints String @default("")
+  goals String @default("")
+  capabilities Capability[]
+  needs Need[]
+  updatedAt DateTime @updatedAt
+}
+model Capability {
+  id String @id @default(cuid())
+  label String
+  profileId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  @@unique([profileId, label])
+}
+model Need {
+  id String @id @default(cuid())
+  label String
+  profileId String
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  @@unique([profileId, label])
+}
+model Opportunity {
+  id String @id @default(cuid())
+  title String
+  organization String
+  category String
+  location String
+  industry String
+  description String
+  requirements String[]
+  offers String[]
+  sourceUrl String?
+  publishedAt DateTime @default(now())
+  deadline DateTime?
+  isDemo Boolean @default(false)
+  ownerId String?
+  owner Workspace? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  saved SavedOpportunity[]
+  @@index([ownerId])
+  @@index([category])
+}
+model SavedOpportunity {
+  workspaceId String
+  opportunityId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@id([workspaceId, opportunityId])
+  @@index([opportunityId])
+}
