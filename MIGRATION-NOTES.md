@@ -35,6 +35,17 @@ account, deleting only superseded guest workspaces of the same account.
 and (only if the columns must go too) drop them in a new migration. Because
 everything added is nullable or a new table, reverting the code alone is safe.
 
+## Phase 3 — Collaboration and source-backed impact (2026-11-14)
+Additive migration `20261114084803_phase3_collaboration_metrics`:
+`Message` (threads on accepted connections), `Tracker` (applications/leads,
+stages identified→applied→in conversation→committed→closed), `ActivityEvent`
+(append-only activity log), plus a generated `tsvector` column with GIN index
+on `Opportunity` for ranked full-text search. Note: the generated column uses
+immutable expressions only (`array_to_string` on arrays is not immutable, so
+requirements/offers are matched with `unnest ... ILIKE` at query time).
+Rollback: `git revert` + `npx prisma migrate resolve --rolled-back
+20261114084803_phase3_collaboration_metrics`.
+
 ## Known gaps / next phase
 - Real LLM inference is unreachable from this sandbox (egress proxy returns a
   canned `OK`); code paths are stub-detecting and degrade to manual publish.

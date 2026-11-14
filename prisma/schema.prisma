@@ -1,105 +1,166 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
-  url = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
+
 model Account {
-  id String @id @default(cuid())
-  email String @unique
-  passwordHash String
+  id               String      @id @default(cuid())
+  email            String      @unique
+  passwordHash     String
   recoveryCodeHash String
-  createdAt DateTime @default(now())
-  workspaces Workspace[]
+  createdAt        DateTime    @default(now())
+  workspaces       Workspace[]
 }
+
 model Workspace {
-  id String @id @default(cuid())
-  tokenHash String @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  accountId String?
-  account Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  profile Profile?
-  saved SavedOpportunity[]
-  listings Opportunity[]
-  sentRequests ConnectionRequest[] @relation("fromWorkspace")
+  id               String              @id @default(cuid())
+  tokenHash        String              @unique
+  expiresAt        DateTime
+  createdAt        DateTime            @default(now())
+  accountId        String?
+  account          Account?            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  profile          Profile?
+  saved            SavedOpportunity[]
+  trackers         Tracker[]
+  events           ActivityEvent[]
+  listings         Opportunity[]
+  sentRequests     ConnectionRequest[] @relation("fromWorkspace")
   receivedRequests ConnectionRequest[] @relation("toWorkspace")
+  sentMessages     Message[]
 }
+
 model Profile {
-  id String @id @default(cuid())
-  workspaceId String @unique
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name String
-  role String
-  roles String[]
-  industry String
-  location String
-  description String
-  stage String @default("")
-  interests String @default("")
-  constraints String @default("")
-  goals String @default("")
-  visibility String @default("private")
+  id           String       @id @default(cuid())
+  workspaceId  String       @unique
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String
+  role         String
+  roles        String[]
+  industry     String
+  location     String
+  description  String
+  stage        String       @default("")
+  interests    String       @default("")
+  constraints  String       @default("")
+  goals        String       @default("")
+  visibility   String       @default("private")
   capabilities Capability[]
-  needs Need[]
-  updatedAt DateTime @updatedAt
+  needs        Need[]
+  updatedAt    DateTime     @updatedAt
 }
+
 model Capability {
-  id String @id @default(cuid())
-  label String
+  id        String  @id @default(cuid())
+  label     String
   profileId String
-  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
   @@unique([profileId, label])
 }
+
 model Need {
-  id String @id @default(cuid())
-  label String
+  id        String  @id @default(cuid())
+  label     String
   profileId String
-  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
   @@unique([profileId, label])
 }
+
 model Opportunity {
-  id String @id @default(cuid())
-  title String
+  id           String             @id @default(cuid())
+  title        String
   organization String
-  category String
-  location String
-  industry String
-  description String
+  category     String
+  location     String
+  industry     String
+  description  String
   requirements String[]
-  offers String[]
-  sourceUrl String?
-  evidence Json?
-  publishedAt DateTime @default(now())
-  deadline DateTime?
-  isDemo Boolean @default(false)
-  ownerId String?
-  owner Workspace? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  saved SavedOpportunity[]
+  offers       String[]
+  sourceUrl    String?
+  evidence     Json?
+  publishedAt  DateTime           @default(now())
+  deadline     DateTime?
+  isDemo       Boolean            @default(false)
+  ownerId      String?
+  owner        Workspace?         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  saved        SavedOpportunity[]
+  trackers     Tracker[]
+
   @@index([ownerId])
   @@index([category])
 }
+
 model SavedOpportunity {
-  workspaceId String
+  workspaceId   String
   opportunityId String
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
   @@id([workspaceId, opportunityId])
   @@index([opportunityId])
 }
+
 model ConnectionRequest {
-  id String @id @default(cuid())
+  id              String    @id @default(cuid())
   fromWorkspaceId String
-  toWorkspaceId String
-  fromWorkspace Workspace @relation("fromWorkspace", fields: [fromWorkspaceId], references: [id], onDelete: Cascade)
-  toWorkspace Workspace @relation("toWorkspace", fields: [toWorkspaceId], references: [id], onDelete: Cascade)
-  opportunityId String?
-  message String @default("")
-  status String @default("pending")
-  createdAt DateTime @default(now())
-  respondedAt DateTime?
+  toWorkspaceId   String
+  fromWorkspace   Workspace @relation("fromWorkspace", fields: [fromWorkspaceId], references: [id], onDelete: Cascade)
+  toWorkspace     Workspace @relation("toWorkspace", fields: [toWorkspaceId], references: [id], onDelete: Cascade)
+  opportunityId   String?
+  message         String    @default("")
+  status          String    @default("pending")
+  createdAt       DateTime  @default(now())
+  respondedAt     DateTime?
+  messages        Message[]
+
   @@index([toWorkspaceId, status])
   @@index([fromWorkspaceId, status])
+}
+
+model Message {
+  id        String            @id @default(cuid())
+  requestId String
+  request   ConnectionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    Workspace         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime          @default(now())
+
+  @@index([requestId, createdAt])
+}
+
+model Tracker {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  kind          String
+  title         String
+  stage         String       @default("identified")
+  notes         String       @default("")
+  counterpart   String       @default("")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([workspaceId, kind])
+}
+
+model ActivityEvent {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  kind          String
+  detail        String    @default("")
+  opportunityId String?
+  createdAt     DateTime  @default(now())
+
+  @@index([kind, createdAt])
+  @@index([workspaceId, createdAt])
 }

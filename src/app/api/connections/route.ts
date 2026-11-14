@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { ApiError, handle, jsonBody, workspace } from '@/lib/session';
+import { recordEvent } from '@/lib/events';
 export const runtime = 'nodejs';
 
 const createInput = z.object({
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     const duplicate = await db().connectionRequest.findFirst({ where: { fromWorkspaceId: session.id, toWorkspaceId: input.toWorkspaceId, status: 'pending' } });
     if (duplicate) throw new ApiError('A request to this workspace is already pending.', 409);
     const created = await db().connectionRequest.create({ data: { fromWorkspaceId: session.id, toWorkspaceId: input.toWorkspaceId, opportunityId: input.opportunityId, message: input.message } });
+    await recordEvent(session.id, 'connection.requested', '', input.opportunityId ?? null).catch(() => {});
     return { id: created.id, status: created.status };
   });
 }
@@ -50,6 +52,7 @@ export async function PATCH(request: Request) {
     if (!existing || existing.toWorkspaceId !== session.id) throw new ApiError('Request not found.', 404);
     if (existing.status !== 'pending') throw new ApiError('This request was already answered.', 409);
     const updated = await db().connectionRequest.update({ where: { id: input.id }, data: { status: input.status, respondedAt: new Date() } });
+    await recordEvent(session.id, `connection.${input.status}`, '', existing.opportunityId).catch(() => {});
     return { id: updated.id, status: updated.status };
   });
 }
