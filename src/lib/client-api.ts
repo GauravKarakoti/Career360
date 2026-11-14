@@ -96,7 +96,7 @@ export const messages = {
 
 // Message catalogs live in src/messages/*.json; Marathi falls back to the Hindi
 // copy where a dedicated string is not written yet, and Hindi to English.
-const PLURAL = /\{count, plural, ([^}]*(?:\{[^}]*\})*)\}/;
+const PLURAL = /\{count, plural, ((?:[^{}]|\{[^{}]*\})*)\}/;
 
 function formatPlural(lang: Lang, template: string, count: number): string {
   const cases = new Map<string, string>();
