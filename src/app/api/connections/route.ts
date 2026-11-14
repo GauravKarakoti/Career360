@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { ApiError, handle, jsonBody, workspace } from '@/lib/session';
+import { ApiError, handle, jsonBody, workspace, rateLimit } from '@/lib/session';
 import { recordEvent } from '@/lib/events';
 export const runtime = 'nodejs';
 
@@ -13,6 +13,7 @@ const respondInput = z.object({ id: z.string().min(1).max(40), status: z.enum(['
 
 export async function GET(request: Request) {
   return handle(request, async () => {
+    rateLimit(request, 'connections', 15);
     const session = await workspace();
     const [sent, received] = await Promise.all([
       db().connectionRequest.findMany({ where: { fromWorkspaceId: session.id }, orderBy: { createdAt: 'desc' }, take: 50, include: { toWorkspace: { select: { id: true, profile: { select: { name: true, roles: true, visibility: true } } } } } }),
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
   });
 }
 export async function POST(request: Request) {
+
   return handle(request, async () => {
     const session = await workspace();
     const input = createInput.parse(await jsonBody(request));

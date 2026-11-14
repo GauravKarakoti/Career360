@@ -38,7 +38,15 @@ export async function adoptWorkspace(accountId: string, workspaceId: string) {
     const [oldProfile] = await client.profile.findMany({ where: { workspaceId: old.id } });
     const currentProfile = await client.profile.findUnique({ where: { workspaceId } });
     if (oldProfile && !currentProfile) await client.profile.update({ where: { id: oldProfile.id }, data: { workspaceId } });
-    await client.savedOpportunity.deleteMany({ where: { workspaceId: old.id } });
+    const staleSaved = await client.savedOpportunity.findMany({ where: { workspaceId: old.id }, select: { opportunityId: true } });
+    if (staleSaved.length) {
+      const currentSaved = await client.savedOpportunity.findMany({ where: { workspaceId }, select: { opportunityId: true } });
+      const keep = new Set(currentSaved.map((s) => s.opportunityId));
+      for (const row of staleSaved) {
+        if (keep.has(row.opportunityId)) await client.savedOpportunity.delete({ where: { workspaceId_opportunityId: { workspaceId: old.id, opportunityId: row.opportunityId } } });
+        else await client.savedOpportunity.update({ where: { workspaceId_opportunityId: { workspaceId: old.id, opportunityId: row.opportunityId } }, data: { workspaceId } });
+      }
+    }
     await client.connectionRequest.updateMany({ where: { fromWorkspaceId: old.id }, data: { fromWorkspaceId: workspaceId } });
     await client.connectionRequest.updateMany({ where: { toWorkspaceId: old.id }, data: { toWorkspaceId: workspaceId } });
     await client.opportunity.updateMany({ where: { ownerId: old.id }, data: { ownerId: workspaceId } });

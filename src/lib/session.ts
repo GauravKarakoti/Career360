@@ -47,6 +47,18 @@ export function guard(request: Request) {
   if (!bucket || bucket.until < now) { bucket = { count: 0, until: now + 60000 }; buckets.set(key, bucket); }
   if (++bucket.count > 120) throw new ApiError('Too many requests. Please try again in a minute.', 429);
 }
+// Stricter per-route limit for sensitive endpoints (auth, ingest, messages,
+// connections, org changes), on top of the global per-IP guard above.
+export function rateLimit(request: Request, bucket: string, limit: number, windowMs = 60000) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
+  const key = `${bucket}:${ip}`;
+  const now = Date.now();
+  if (buckets.size > 10000) for (const [id, item] of buckets) if (item.until < now) buckets.delete(id);
+  let entry = buckets.get(key);
+  if (!entry || entry.until < now) { entry = { count: 0, until: now + windowMs }; buckets.set(key, entry); }
+  if (++entry.count > limit) throw new ApiError(`Too many requests. Please try again in ${Math.ceil((entry.until - now) / 1000)} seconds.`, 429);
+}
+
 export async function jsonBody(request: Request) {
   const body = await request.text();
   if (body.length > 20000) throw new ApiError('Please keep your submission under 20 KB.', 413);
