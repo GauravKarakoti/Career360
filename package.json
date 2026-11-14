@@ -1,12 +1,12 @@
 {
-    "name": "opportunity360-ai",
+    "name": "career360",
     "version": "0.1.0",
     "private": true,
     "scripts": {
         "dev": "next dev --hostname 0.0.0.0 --port 3000",
         "build": "prisma generate && next build",
         "start": "next start --hostname 0.0.0.0 --port 3000",
-        "db:gen": "prisma migrate",
+        "db:gen": "prisma generate",
         "db:migrate": "node scripts/database.mjs migrate",
         "db:seed": "node scripts/database.mjs seed",
         "typecheck": "tsc --noEmit",

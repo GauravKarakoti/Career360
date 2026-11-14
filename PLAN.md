@@ -1,4 +1,4 @@
-# Opportunity360 AI — implementation plan
+# Career360 — implementation plan
 
 ## Goal and users
 Build the selected Opportunity Workspace for founders, candidates and other stakeholders. Working means a visitor can save a private structured Opportunity DNA profile, discover database-backed opportunities, inspect transparent mutual-fit reasoning and source limitations, and save an opportunity across reloads.

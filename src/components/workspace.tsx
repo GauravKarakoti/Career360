@@ -324,7 +324,7 @@ export default function Workspace() {
               <Dna aria-hidden className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-base font-bold text-slate-900">Opportunity360 AI</p>
+              <p className="text-base font-bold text-slate-900">Career360</p>
               <p className="text-xs text-slate-500">From information to opportunity to action</p>
             </div>
           </div>
