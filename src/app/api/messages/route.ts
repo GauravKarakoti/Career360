@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { ApiError, handle, jsonBody, workspace } from '@/lib/session';
+import { ApiError, handle, jsonBody, workspace, rateLimit } from '@/lib/session';
 import { recordEvent } from '@/lib/events';
 export const runtime = 'nodejs';
 
@@ -23,7 +23,9 @@ export async function GET(request: Request) {
   });
 }
 export async function POST(request: Request) {
+
   return handle(request, async () => {
+    rateLimit(request, 'messages', 30);
     const session = await workspace();
     const input = sendInput.parse(await jsonBody(request));
     const thread = await db().connectionRequest.findUnique({ where: { id: input.requestId } });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { ApiError, handle, jsonBody, workspace } from '@/lib/session';
+import { ApiError, handle, jsonBody, rateLimit, workspace } from '@/lib/session';
 import { recordEvent } from '@/lib/events';
 
 export const runtime = 'nodejs';
@@ -77,6 +77,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return handle(request, async () => {
+    rateLimit(request, 'connections', 15);
     const session = await workspace();
     const input = createInput.parse(await jsonBody(request));
 
@@ -149,6 +150,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   return handle(request, async () => {
+    rateLimit(request, 'connections', 15);
     const session = await workspace();
     const input = respondInput.parse(await jsonBody(request));
     const existing = await db().connectionRequest.findUnique({ where: { id: input.id } });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { ApiError, handle, jsonBody, workspace } from '@/lib/session';
+import { ApiError, handle, jsonBody, workspace, rateLimit } from '@/lib/session';
 import { chatJson, schemaOf } from '@/lib/ai';
 export const runtime = 'nodejs';
 
@@ -28,7 +28,9 @@ const extractionSchema = schemaOf({
 }, ['title', 'organization', 'category', 'location', 'industry', 'description', 'requirements', 'offers', 'evidence', 'confidence']);
 
 export async function POST(request: Request) {
+
   return handle(request, async () => {
+    rateLimit(request, 'ingest', 8);
     const session = await workspace();
     const { url } = input.parse(await jsonBody(request));
 

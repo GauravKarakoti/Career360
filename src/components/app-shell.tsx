@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  AlertCircle, CheckCircle2, Dna, LayoutDashboard, Loader2, MessagesSquare,
+  AlertCircle, CheckCircle2, Building2, Dna, LayoutDashboard, Loader2, MessagesSquare,
   Radar, Users,
 } from 'lucide-react';
 import { useWorkspace } from '@/components/workspace-context';
+import { LANGS } from '@/lib/client-api';
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -14,6 +15,7 @@ const NAV = [
   { href: '/discover', label: 'Discover', icon: Radar },
   { href: '/connections', label: 'Connections', icon: MessagesSquare },
   { href: '/trackers', label: 'Trackers', icon: Users },
+  { href: '/organizations', label: 'Organizations', icon: Building2 },
   { href: '/pulse', label: 'Market Pulse', icon: Radar },
 ];
 
@@ -57,9 +59,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                 </span>
               )}
-              <button type="button" onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+              <button type="button" onClick={() => setLang(lang === 'en' ? 'hi' : lang === 'hi' ? 'mr' : 'en')}
                 className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50" aria-label="Switch language">
-                {lang === 'en' ? 'हिंदी' : 'English'}
+                {LANGS[(LANGS.findIndex(l => l.id === lang) + 1) % LANGS.length].label}
               </button>
               {email ? (
                 <button type="button" onClick={signOut}

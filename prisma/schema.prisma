@@ -8,13 +8,72 @@ datasource db {
 }
 
 model Account {
-  id               String      @id @default(cuid())
-  email            String      @unique
+  id               String          @id @default(cuid())
+  email            String          @unique
   passwordHash     String
   recoveryCodeHash String
   primaryRole      String?
-  createdAt        DateTime    @default(now())
+  createdAt        DateTime        @default(now())
   workspaces       Workspace[]
+  memberships      OrgMembership[]
+  orgDocuments     OrgDocument[]
+  auditLogs        AuditLog[]
+}
+
+model Organization {
+  id           String         @id @default(cuid())
+  name         String         @unique
+  slug         String         @unique
+  description  String         @default("")
+  website      String         @default("")
+  adminKeyHash String
+  verified     Boolean        @default(false)
+  verifiedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  memberships  OrgMembership[]
+  documents    OrgDocument[]
+  auditLogs    AuditLog[]
+}
+
+model OrgMembership {
+  id        String      @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  accountId String
+  account   Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  role      String      @default("member")
+  createdAt DateTime    @default(now())
+
+  @@unique([orgId, accountId])
+  @@index([accountId])
+}
+
+model OrgDocument {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  accessLevel String       @default("members")
+  createdById String?
+  createdBy   Account?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId, createdAt])
+}
+
+model AuditLog {
+  id        String       @id @default(cuid())
+  orgId     String?
+  org       Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  accountId String?
+  account   Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  action    String
+  detail    String       @default("")
+  createdAt DateTime     @default(now())
+
+  @@index([orgId, createdAt])
+  @@index([action, createdAt])
 }
 
 model Workspace {

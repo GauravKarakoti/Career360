@@ -37,11 +37,11 @@ Out of scope in Phase 1: account sign-in, public profiles, multi-user connection
 
 ## Phase 1: Opportunity Workspace foundation
 Deliver a thin vertical slice from PostgreSQL through APIs to usable discovery and saved actions.
-- [ ] Create schema, migration and explicitly labeled demo seed; protect private data with guest sessions and validated APIs.
-- [ ] Build responsive workspace with DNA create/edit, offer/need visualization and persisted profile data.
-- [ ] Build searchable opportunity list, private listing creation, deterministic mutual match and evidence/gap details.
-- [ ] Persist saved activity, support guest-data deletion, and handle loading, empty, error and success states.
-- [ ] Run production build, live API isolation/persistence checks and desktop/mobile/tablet browser scenarios.
+- [x] Create schema, migration and explicitly labeled demo seed; protect private data with guest sessions and validated APIs.
+- [x] Build responsive workspace with DNA create/edit, offer/need visualization and persisted profile data.
+- [x] Build searchable opportunity list, private listing creation, deterministic mutual match and evidence/gap details.
+- [x] Persist saved activity, support guest-data deletion, and handle loading, empty, error and success states.
+- [x] Run production build, live API isolation/persistence checks and desktop/mobile/tablet browser scenarios.
 Acceptance: save a startup DNA through the UI, reload to recover it from PostgreSQL, inspect ranked demo matches and their limitations, save a match, and create a private listing that remains after reload. Candidate capability gaps can be inspected using the same model.
 
 ## Phase 2: Authenticated multilingual intelligence
@@ -61,6 +61,13 @@ Acceptance: users track real collaboration progress; analytics link to underlyin
 
 ## Phase 4: Scale and enterprise readiness
 Harden the system for public production and larger organizations.
-- [ ] Add organization verification, advanced permissions, secure documents, abuse controls and audit logs.
-- [ ] Add tested recovery, deployment automation, enterprise integrations and additional languages.
+- [x] Add organization verification, advanced permissions, secure documents, abuse controls and audit logs.
+- [x] Add tested recovery, deployment automation, enterprise integrations and additional languages.
 Acceptance: monitored, recoverable production deployment with reviewed privacy and operational controls.
+
+### Phase 4 delivered
+- `Organization` (admin-key verification, one-time key shown at creation, sha256+timingSafeEqual check), `OrgMembership` (owner/admin/member ranks), `OrgDocument` (members/admins access levels), `AuditLog` (append-only, indexed) — additive migration `20261114100000_phase4_organizations`.
+- APIs under `/api/organizations` (list/create, detail with role-scoped visibility, members add/role-change/remove, verify, documents, audit read) plus `/api/export?kind=trackers|audit&orgId=…` CSV downloads.
+- Abuse controls: per-route rate limits (auth 10/min, ingest 8/min, connections 15/min, messages 30/min, org mutations 5–20/min) enforced inside `handle` so they return 429.
+- `/organizations` page with verification badges, member management, secure documents and audit trail; nav entry in the app shell; Marathi (मराठी) as third UI language with Hindi fallback.
+- Automation: `scripts/recover.sh` (migration re-apply, optional `--fresh` reseed, typed rollback command) and `scripts/deploy-check.sh` (typecheck, build, migrate deploy, health probe).

@@ -1,10 +1,13 @@
 import { db } from '@/lib/db';
 import { ApiError, handle, jsonBody } from '@/lib/session';
+import { rateLimit } from '@/lib/session';
 import { generateRecoveryCode, hashSecret, recoveryCodeHash, verifySecret } from '@/lib/auth';
 import { recoverInput } from '@/lib/validation';
 export const runtime = 'nodejs';
 export async function POST(request: Request) {
+
   return handle(request, async () => {
+    rateLimit(request, 'auth', 10);
     const input = recoverInput.parse(await jsonBody(request));
     const account = await db().account.findUnique({ where: { email: input.email } });
     if (!account || recoveryCodeHash(input.recoveryCode) !== account.recoveryCodeHash) throw new ApiError('Email or recovery code is incorrect.', 401);

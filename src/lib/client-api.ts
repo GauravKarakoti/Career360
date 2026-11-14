@@ -73,8 +73,13 @@ export const EMPTY_LISTING: ListingForm = {
   description: '', requirements: '', offers: '', sourceUrl: '', deadline: '',
 };
 
-export type Lang = 'en' | 'hi';
-export const t = (lang: Lang, en: string, hi: string) => (lang === 'en' ? en : hi);
+export type Lang = 'en' | 'hi' | 'mr';
+export const LANGS: { id: Lang; label: string }[] = [
+  { id: 'en', label: 'English' }, { id: 'hi', label: 'हिंदी' }, { id: 'mr', label: 'मराठी' },
+];
+// Marathi falls back to the Hindi copy where a dedicated string is not written yet.
+export const t = (lang: Lang, en: string, hi: string, mr?: string) =>
+  lang === 'en' ? en : lang === 'mr' ? (mr ?? hi) : hi;
 
 export const splitTerms = (value: string) =>
   value.split(',').map(item => item.trim()).filter(Boolean).slice(0, 20);
