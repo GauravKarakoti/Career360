@@ -47,6 +47,8 @@ export async function adoptWorkspace(accountId: string, workspaceId: string) {
         else await client.savedOpportunity.update({ where: { workspaceId_opportunityId: { workspaceId: old.id, opportunityId: row.opportunityId } }, data: { workspaceId } });
       }
     }
+    await client.tracker.updateMany({ where: { workspaceId: old.id }, data: { workspaceId } });
+    await client.message.updateMany({ where: { senderId: old.id }, data: { senderId: workspaceId } });
     await client.connectionRequest.updateMany({ where: { fromWorkspaceId: old.id }, data: { fromWorkspaceId: workspaceId } });
     await client.connectionRequest.updateMany({ where: { toWorkspaceId: old.id }, data: { toWorkspaceId: workspaceId } });
     await client.opportunity.updateMany({ where: { ownerId: old.id }, data: { ownerId: workspaceId } });

@@ -19,11 +19,40 @@ export async function GET(request: Request) {
     });
     const count = (kind: string) => grouped.filter(row => row.kind === kind).reduce((sum, row) => sum + row._count._all, 0);
 
-    const [workspaceAgg, listingAgg, acceptedAgg] = await Promise.all([
+    const [workspaceAgg, listingAgg, acceptedAgg, sourceAgg] = await Promise.all([
       db().workspace.aggregate({ _count: { _all: true } }),
       db().opportunity.aggregate({ _count: { _all: true }, where: { publishedAt: { gte: since } } }),
-      db().connectionRequest.aggregate({ _count: { _all: true }, where: { status: 'accepted', respondedAt: { gte: since } } })
+      db().connectionRequest.aggregate({ _count: { _all: true }, where: { status: 'accepted', respondedAt: { gte: since } } }),
+      // SDG tracking: only listings with a citable source count, grouped by
+      // category (an SDG proxy). Verified shares use lastVerifiedAt, so a
+      // number is always bound to a source and a time window.
+      db().opportunity.groupBy({
+        by: ['category'],
+        where: { publishedAt: { gte: since }, sourceUrl: { not: null } },
+        _count: { _all: true }
+      })
     ]);
+    const verifiedAgg = await db().opportunity.groupBy({
+      by: ['category'],
+      where: {
+        publishedAt: { gte: since },
+        sourceUrl: { not: null },
+        sourceStatus: 'verified',
+        lastVerifiedAt: { gte: since }
+      },
+      _count: { _all: true }
+    });
+
+    const sdg = sourceAgg
+      .map(row => {
+        const verified = verifiedAgg.find(v => v.category === row.category)?._count._all ?? 0;
+        return {
+          category: row.category,
+          sourceBackedListings: row._count._all,
+          reverified: verified
+        };
+      })
+      .sort((a, b) => b.sourceBackedListings - a.sourceBackedListings);
 
     const searches = grouped.filter(row => row.kind === 'opportunity.viewed' && row.detail.startsWith('search:')).reduce((sum, row) => sum + row._count._all, 0);
 
@@ -42,7 +71,8 @@ export async function GET(request: Request) {
         stagesAdvanced: count('tracker.advanced'),
         messagesSent: count('message.sent')
       },
-      totals: { workspaces: workspaceAgg._count._all }
+      totals: { workspaces: workspaceAgg._count._all },
+      sdg
     };
   });
 }

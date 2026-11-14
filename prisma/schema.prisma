@@ -144,6 +144,8 @@ model Opportunity {
   offers       String[]
   sourceUrl    String?
   evidence     Json?
+  sourceStatus String?
+  lastVerifiedAt DateTime?
   publishedAt  DateTime           @default(now())
   deadline     DateTime?
   isDemo       Boolean            @default(false)

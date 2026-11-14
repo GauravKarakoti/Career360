@@ -46,6 +46,19 @@ export default function PulsePage() {
               <li>Messages sent: {metrics.outcomes.messagesSent}</li>
             </ul>
           </section>
+          <section className="sm:col-span-2 rounded-xl border border-sky-200 bg-sky-50 p-5 text-sm">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-sky-700">Source-backed impact by category</h2>
+            <p className="mt-1 text-xs text-slate-500">Listings citing a live source URL, and how many re-verified against that source in the last 30 days.</p>
+            {metrics.sdg.length === 0 ? (
+              <p className="mt-2 text-slate-700">No source-backed listings in this window yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-1 text-slate-700">
+                {metrics.sdg.map(row => (
+                  <li key={row.category}>{row.category}: {row.sourceBackedListings} source-backed, {row.reverified} re-verified</li>
+                ))}
+              </ul>
+            )}
+          </section>
           <p className="sm:col-span-2 text-xs text-slate-500">
             Discovery numbers show interest, not results. Only “Achieved outcomes” reflects real progress.
           </p>

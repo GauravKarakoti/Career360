@@ -54,9 +54,9 @@ Acceptance: a startup and candidate can use the specified multilingual MVP flows
 
 ## Phase 3: Collaboration and source-backed impact
 Expand actions into measurable collaboration and trustworthy market intelligence.
-- [ ] Add messaging, collaboration workspaces, application and lead trackers.
-- [ ] Add authorized ingestion jobs, re-verification, search indexing and monitoring.
-- [ ] Add source/time-bounded Market Pulse and SDG metrics separating discovery from achieved outcomes.
+- [x] Add messaging, collaboration workspaces, application and lead trackers.
+- [x] Add authorized ingestion jobs, re-verification, search indexing and monitoring.
+- [x] Add source/time-bounded Market Pulse and SDG metrics separating discovery from achieved outcomes.
 Acceptance: users track real collaboration progress; analytics link to underlying events and sources.
 
 ## Phase 4: Scale and enterprise readiness

@@ -18,7 +18,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const org = await db().organization.findUnique({ where: { id } });
     if (!org) throw new ApiError('Organization not found.', 404);
-    if (org.verified) return { organization: org, alreadyVerified: true };
+    if (org.verified) {
+      const { adminKeyHash: _hash, ...safe } = org;
+      return { organization: safe, alreadyVerified: true };
+    }
 
     const attempt = createHash('sha256').update(adminKey).digest();
     const expected = Buffer.from(org.adminKeyHash, 'hex');
@@ -29,6 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const updated = await db().organization.update({ where: { id }, data: { verified: true, verifiedAt: new Date() } });
     await audit(id, session.accountId!, 'org.verified', 'admin key confirmed');
-    return { organization: updated };
+    const { adminKeyHash: _hash, ...safe } = updated;
+    return { organization: safe };
   });
 }

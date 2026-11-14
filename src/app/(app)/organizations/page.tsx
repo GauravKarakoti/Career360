@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { BadgeCheck, Building2, Loader2, ShieldCheck } from 'lucide-react';
-import { api, t as tr, type Lang } from '@/lib/client-api';
+import { api, t as tr, type Lang, type MsgKey } from '@/lib/client-api';
 import { useWorkspace } from '@/components/workspace-context';
 
 type OrgCard = {

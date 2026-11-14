@@ -66,6 +66,7 @@ export type Metrics = {
   discovery: { searches: number; views: number; saves: number; listingsPublished: number };
   outcomes: { connectionRequests: number; connectionsAccepted: number; trackersCreated: number; stagesAdvanced: number; messagesSent: number };
   totals: { workspaces: number };
+  sdg: { category: string; sourceBackedListings: number; reverified: number }[];
 };
 
 export const EMPTY_FORM: ProfileForm = {
@@ -112,7 +113,8 @@ export const t = (lang: Lang, key: MsgKey, vars?: { count?: number }) => {
   const raw = messages[lang]?.[key] ?? (lang === 'mr' ? messages.hi[key] : messages.en[key]) ?? messages.en[key];
   let text: string = typeof raw === 'string' ? raw : key;
   if (vars && typeof vars.count === 'number' && PLURAL.test(text)) {
-    text = text.replace(PLURAL, (_, tpl: string) => formatPlural(lang, tpl, vars.count));
+    const count = vars.count;
+    text = text.replace(PLURAL, (_, tpl: string) => formatPlural(lang, tpl, count));
   }
   return text.replace(/\{count\}/g, String(vars?.count ?? '{count}'));
 };
