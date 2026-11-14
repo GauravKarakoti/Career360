@@ -17,7 +17,7 @@ const ROLE_BLURBS: Record<string, string> = {
   'Sponsor / Brand': 'Events and creators worth your budget',
 };
 
-const inputClass = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100';
+const inputClass = 'mt-1 w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100';
 
 export function SignUpForm() {
   const router = useRouter();

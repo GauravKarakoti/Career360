@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink } from 'lucide-react';
 import type { MatchResult, Opportunity } from '@/lib/client-api';
 
-export const fieldClass = 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500';
+export const fieldClass = 'mt-1 w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
 export const labelClass = 'block text-sm font-medium text-slate-700';
 
 export function Chip({ label, tone }: { label: string; tone: 'offer' | 'need' | 'gap' | 'preferred' }) {
@@ -20,9 +20,9 @@ export function Chip({ label, tone }: { label: string; tone: 'offer' | 'need' | 
 export function MatchPanel({ match, evidence }: { match: MatchResult; evidence?: { field: string; quote: string }[] | null }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70">
+    <div className="mt-3 rounded-[10px] border border-slate-200 bg-slate-50/70">
       <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-700">
+        className="flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:text-brand-700">
         <span>Why this match — {match.forYou.length + match.forThem.length} complementary connections</span>
         <ChevronDown aria-hidden className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -105,14 +105,14 @@ export function OpportunityCard({ item, saved, onToggleSave, onTrack }: {
       ? 'bg-red-50 text-red-700 ring-red-200'
       : 'bg-slate-100 text-slate-600 ring-slate-300';
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <article className="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/[0.03] transition hover:border-brand-200 hover:shadow-md hover:shadow-brand-900/[0.06] sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-base font-semibold text-slate-900">{item.title}</h3>
+          <h3 className="text-base font-semibold">{item.title}</h3>
           <p className="mt-0.5 text-sm text-slate-500">{item.organization} · {item.category} · {item.location}</p>
         </div>
         {item.match && (
-          <span className="shrink-0 rounded-full bg-brand-600 px-2.5 py-1 text-xs font-bold text-white">
+          <span className="shrink-0 rounded-full bg-brand-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm shadow-brand-600/30">
             {item.match.score}% match
           </span>
         )}

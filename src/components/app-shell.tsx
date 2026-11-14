@@ -36,15 +36,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href="/dashboard" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white">
+              <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-brand-600 text-white shadow-sm shadow-brand-600/30">
                 <Dna aria-hidden className="h-5 w-5" />
               </span>
               <span>
-                <span className="block text-base font-bold text-slate-900">Career360</span>
+                <span className="block text-base font-bold tracking-tight text-heading">Career360</span>
                 <span className="block text-xs text-slate-500">From information to opportunity to action</span>
               </span>
             </Link>
@@ -81,10 +81,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               const active = pathname === entry.href;
               return (
                 <Link key={entry.href} href={entry.href} aria-current={active ? 'page' : undefined}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                    active ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-sm font-medium transition ${
+                    active
+                      ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/25'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-ink'
                   }`}>
-                  <entry.icon aria-hidden className="h-4 w-4" /> {entry.label}
+                  <entry.icon aria-hidden className={`h-4 w-4 ${active ? '' : 'text-slate-400'}`} /> {entry.label}
                 </Link>
               );
             })}

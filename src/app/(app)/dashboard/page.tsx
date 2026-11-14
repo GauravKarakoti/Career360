@@ -90,11 +90,11 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-brand-700">
+      <section className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/[0.03] sm:p-10">
+        <p className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-700 ring-1 ring-inset ring-brand-200">
           Career360 · {roleLabel} dashboard
         </p>
-        <h1 className="mt-2 max-w-2xl text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+        <h1 className="mt-3 max-w-2xl text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
           {copy.headline}
         </h1>
         <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600">{copy.sub}</p>
@@ -105,11 +105,11 @@ export default function DashboardPage() {
         )}
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href={hasProfile ? copy.primary.href : '/dna'}
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">
+            className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-600/25 transition hover:bg-brand-700">
             {hasProfile ? copy.primary.label : 'Build my Opportunity DNA'} <ChevronRight aria-hidden className="h-4 w-4" />
           </Link>
           <Link href="/pulse"
-            className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+            className="inline-flex items-center gap-2 rounded-[10px] bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 hover:text-ink">
             See Market Pulse
           </Link>
         </div>

@@ -62,12 +62,13 @@ export default async function LandingPage() {
       </header>
 
       <main>
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+        <section className="border-b border-slate-200 bg-canvas">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand-700">
+            <p className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-700 ring-1 ring-inset ring-brand-200">
               Opportunity360 AI · multilingual
             </p>
-            <h1 className="mt-3 text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl">
+            <h1 className="mt-4 text-4xl font-extrabold leading-tight tracking-tight text-heading sm:text-5xl">
               Find the people who need what you offer.
             </h1>
             <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
@@ -77,27 +78,28 @@ export default async function LandingPage() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup"
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700">
+                className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-brand-600/25 transition hover:bg-brand-700">
                 Create my free account <ArrowRight aria-hidden className="h-4 w-4" />
               </Link>
               <Link href="/signin"
-                className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                className="inline-flex items-center gap-2 rounded-[10px] bg-white px-6 py-3 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 hover:text-ink">
                 I already have an account
               </Link>
             </div>
             <p className="mt-4 text-sm text-slate-500">Free during the pilot · your data stays in your private workspace</p>
           </div>
+          </div>
         </section>
 
-        <section aria-label="How it works" className="border-y border-slate-200 bg-slate-50">
+        <section aria-label="How it works" className="border-y border-slate-200 bg-white">
           <div className="mx-auto grid max-w-6xl gap-6 px-4 py-14 sm:px-6 md:grid-cols-3">
             {PILLARS.map((pillar, index) => (
-              <div key={pillar.title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200">
+              <div key={pillar.title} className="rounded-[10px] border border-slate-200 bg-canvas p-6 shadow-sm shadow-slate-900/[0.03]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-brand-600 text-white shadow-sm shadow-brand-600/30">
                   <pillar.icon aria-hidden className="h-5 w-5" />
                 </span>
                 <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-slate-400">Step {index + 1}</p>
-                <h2 className="mt-1 text-lg font-bold text-slate-900">{pillar.title}</h2>
+                <h2 className="mt-1 text-lg font-bold">{pillar.title}</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{pillar.body}</p>
               </div>
             ))}
