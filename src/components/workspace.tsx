@@ -1,6 +1,27 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+
+const copy: Record<'en' | 'hi', {
+  guest: string; saved: (n: number) => string; account: string; signOut: string; reset: string;
+  ingestTitle: string; ingestHint: string; ingestCta: (ingesting: boolean) => string;
+  connectionsHint: string;
+}> = {
+  en: {
+    guest: 'Private guest session', saved: (n: number) => `${n} saved`, account: 'Account', signOut: 'Sign out', reset: 'Reset',
+    ingestTitle: 'Import from a source URL', ingestHint: 'Paste an HTTPS link. AI drafts the listing; you review before publishing.',
+    ingestCta: ingesting => ingesting ? 'Reading source…' : 'Draft from source',
+    connectionsHint: 'Accept or decline requests. Only discoverable profiles can be contacted.',
+  },
+  hi: {
+    guest: 'निजी अतिथि सत्र', saved: (n: number) => `${n} सहेजे`, account: 'खाता', signOut: 'साइन आउट', reset: 'रीसेट',
+    ingestTitle: 'स्रोत लिंक से आयात करें', ingestHint: 'HTTPS लिंक चिपकाएँ। AI मसौदा बनाता है; प्रकाशित करने से पहले आप समीक्षा करें।',
+    ingestCta: ingesting => ingesting ? 'स्रोत पढ़ा जा रहा है…' : 'स्रोत से मसौदा',
+    connectionsHint: 'अनुरोध स्वीकार या अस्वीकार करें। केवल खोजे जा सकने वाली प्रोफ़ाइल से संपर्क हो सकता है।',
+  },
+};
+type Lang = keyof typeof copy;
+const t = (lang: Lang, en: string, hi: string) => (lang === 'en' ? en : hi);
 import {
   AlertCircle, Bookmark, BookmarkCheck, CheckCircle2, ChevronDown, Compass,
   Dna, ExternalLink, Loader2, RotateCcw, Send, Sparkles,
@@ -30,6 +51,7 @@ type Opportunity = {
   requirements: string[];
   offers: string[];
   sourceUrl: string | null;
+  evidence: { field: string; quote: string }[] | null;
   publishedAt: string;
   deadline: string | null;
   isDemo: boolean;
@@ -39,21 +61,32 @@ type Opportunity = {
 type Profile = {
   name: string; role: string; industry: string; location: string; description: string;
   stage: string; interests: string; constraints: string; goals: string;
+  visibility: string;
   capabilities: { label: string }[]; needs: { label: string }[];
 };
 type ProfileForm = {
   name: string; role: string; industry: string; location: string; description: string;
   stage: string; interests: string; constraints: string; goals: string;
-  capabilities: string; needs: string;
+  capabilities: string; needs: string; visibility: string;
 };
 
 const EMPTY_FORM: ProfileForm = {
   name: '', role: 'Candidate', industry: '', location: '', description: '',
   stage: '', interests: '', constraints: '', goals: '', capabilities: '', needs: '',
+  visibility: 'private',
 };
 const EMPTY_LISTING = {
   title: '', organization: '', category: 'Partnerships', location: '', industry: '',
   description: '', requirements: '', offers: '', sourceUrl: '', deadline: '',
+};
+type Draft = {
+  title: string; organization: string; category: string; location: string; industry: string;
+  description: string; requirements: string[]; offers: string[];
+  sourceUrl: string; evidence: { field: string; quote: string }[]; confidence: string;
+};
+type Connections = {
+  sent: { id: string; status: string; message: string; createdAt: string; to: { name: string; roles: string[] } }[];
+  received: { id: string; status: string; message: string; createdAt: string; from: { name: string; roles: string[] } }[];
 };
 
 const splitTerms = (value: string) =>
@@ -195,10 +228,18 @@ export default function Workspace() {
   const [listingForm, setListingForm] = useState(EMPTY_LISTING);
   const [showListingForm, setShowListingForm] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [lang, setLang] = useState<'en' | 'hi'>('en');
+  const [ingestUrl, setIngestUrl] = useState('');
+  const [ingesting, setIngesting] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [connections, setConnections] = useState<Connections | null>(null);
+  const [showConnections, setShowConnections] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const ws = await api<{ profile: Profile | null; saved: { opportunityId: string }[] }>('/api/workspace');
+      const ws = await api<{ profile: Profile | null; saved: { opportunityId: string }[]; email: string | null }>('/api/workspace');
       const feed = await api<{ opportunities: Opportunity[] }>('/api/opportunities');
       if (ws.profile) {
         const p = ws.profile;
@@ -209,6 +250,7 @@ export default function Workspace() {
         });
         setHasProfile(true);
       }
+      setEmail(ws.email);
       setSavedIds(new Set(ws.saved.map(entry => entry.opportunityId)));
       setOpportunities(feed.opportunities);
     } catch (caught) {
@@ -275,10 +317,12 @@ export default function Workspace() {
           requirements: splitTerms(listingForm.requirements),
           offers: splitTerms(listingForm.offers),
           sourceUrl: listingForm.sourceUrl || null,
+          evidence: draft ? draft.evidence : null,
           deadline: deadlineValue && !Number.isNaN(new Date(deadlineValue).getTime()) ? deadlineValue : null,
         }),
       });
       setListingForm(EMPTY_LISTING);
+      setDraft(null);
       setShowListingForm(false);
       await load();
       flash('Listing published. It is marked unverified until a source is confirmed.');
@@ -287,15 +331,66 @@ export default function Workspace() {
     } finally { setPublishing(false); }
   };
 
+  const ingestSource = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIngesting(true); setError('');
+    try {
+      const result = await api<{ draft: Draft }>('/api/ingest', { method: 'POST', body: JSON.stringify({ url: ingestUrl }) });
+      setDraft(result.draft);
+      setListingForm({
+        ...EMPTY_LISTING,
+        title: result.draft.title, organization: result.draft.organization, category: result.draft.category,
+        location: result.draft.location, industry: result.draft.industry, description: result.draft.description,
+        requirements: result.draft.requirements.join(', '), offers: result.draft.offers.join(', '),
+        sourceUrl: result.draft.sourceUrl,
+      });
+      setShowListingForm(true);
+      flash(`Draft extracted with ${result.draft.confidence} confidence. Review every field before publishing.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not extract a listing from that source.');
+    } finally { setIngesting(false); }
+  };
+
+  const loadConnections = async () => {
+    setShowConnections(value => !value);
+    if (showConnections) return;
+    try {
+      setConnections(await api<Connections>('/api/connections'));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not load connection requests.');
+    }
+  };
+
+  const respondConnection = async (id: string, status: 'accepted' | 'declined') => {
+    try {
+      await api('/api/connections', { method: 'PATCH', body: JSON.stringify({ id, status }) });
+      setConnections(await api<Connections>('/api/connections'));
+      flash(status === 'accepted' ? 'Connection accepted.' : 'Request declined.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not respond to the request.');
+    }
+  };
+
   const resetWorkspace = async () => {
     if (!window.confirm('Reset this private workspace? Your DNA, saved items and listings are deleted.')) return;
     try {
       await api('/api/workspace', { method: 'DELETE' });
-      setProfileForm(EMPTY_FORM); setHasProfile(false); setSavedIds(new Set()); setListingForm(EMPTY_LISTING);
+      setProfileForm(EMPTY_FORM); setHasProfile(false); setSavedIds(new Set()); setListingForm(EMPTY_LISTING); setEmail(null); setDraft(null);
       await load();
       flash('Workspace reset. A fresh private session has started.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not reset your workspace.');
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      await api('/api/auth/sign-out', { method: 'POST' });
+      setEmail(null);
+      await load();
+      flash(t(lang, 'Signed out. This guest session starts fresh.', 'साइन आउट। यह अतिथि सत्र नया शुरू होता है।'));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not sign out.');
     }
   };
 
@@ -329,13 +424,37 @@ export default function Workspace() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500">Private guest session · {savedCount} saved</span>
+            <span className="text-xs text-slate-500">
+              {email ? t(lang, 'Signed in as', 'साइन इन:') + ` ${email} · ${savedCount} saved` : t(lang, 'Private guest session', 'निजी अतिथि सत्र') + ` · ${savedCount} saved`}
+            </span>
+            <button type="button" onClick={() => setLang(lang === 'en' ? 'hi' : 'en')}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50" aria-label="Switch language">
+              {lang === 'en' ? 'हिंदी' : 'English'}
+            </button>
+            {email ? (
+              <button type="button" onClick={signOut} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                {t(lang, 'Sign out', 'साइन आउट')}
+              </button>
+            ) : (
+              <button type="button" onClick={() => setShowAuth(value => !value)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
+                {t(lang, 'Account', 'खाता')}
+              </button>
+            )}
             <button type="button" onClick={resetWorkspace}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-              <RotateCcw aria-hidden className="h-4 w-4" /> Reset
+              <RotateCcw aria-hidden className="h-4 w-4" /> {t(lang, 'Reset', 'रीसेट')}
             </button>
           </div>
         </div>
+        {showAuth && (
+          <div className="border-t border-slate-200 bg-slate-50">
+            <AuthPanel
+              lang={lang}
+              onAuthed={async (signedEmail) => { setEmail(signedEmail); setShowAuth(false); await load(); flash(t(lang, 'Signed in. Your data follows your account.', 'साइन इन पूर्ण। आपका डेटा खाते से जुड़ा है।')); }}
+              onError={setError}
+            />
+          </div>
+        )}
       </header>
 
       {(error || notice) && (
@@ -453,8 +572,67 @@ export default function Workspace() {
                 className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700">
                 {showListingForm ? 'Close' : '+ Post listing'}
               </button>
+              <button type="button" onClick={loadConnections} aria-expanded={showConnections}
+                className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                Connections
+              </button>
             </div>
           </div>
+
+          {showConnections && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm">
+              <p className="text-xs text-slate-500">{copy[lang].connectionsHint}</p>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <h3 className="font-semibold text-slate-900">Received</h3>
+                  {connections?.received.length
+                    ? <ul className="mt-2 space-y-2">
+                        {connections.received.map(item => (
+                          <li key={item.id} className="rounded-lg border border-slate-200 p-3">
+                            <p className="font-medium">{item.from.name}</p>
+                            {item.message && <p className="mt-0.5 text-xs text-slate-600">“{item.message}”</p>}
+                            {item.status === 'pending' ? (
+                              <div className="mt-2 flex gap-2">
+                                <button type="button" onClick={() => respondConnection(item.id, 'accepted')}
+                                  className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Accept</button>
+                                <button type="button" onClick={() => respondConnection(item.id, 'declined')}
+                                  className="rounded-lg px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">Decline</button>
+                              </div>
+                            ) : <p className="mt-1 text-xs capitalize text-slate-500">{item.status}</p>}
+                          </li>
+                        ))}
+                      </ul>
+                    : <p className="mt-2 text-xs text-slate-500">No requests yet.</p>}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">Sent</h3>
+                  {connections?.sent.length
+                    ? <ul className="mt-2 space-y-2">
+                        {connections.sent.map(item => (
+                          <li key={item.id} className="rounded-lg border border-slate-200 p-3">
+                            <p className="font-medium">{item.to.name}</p>
+                            <p className="mt-0.5 text-xs capitalize text-slate-500">{item.status}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    : <p className="mt-2 text-xs text-slate-500">Nothing sent yet.</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={ingestSource} className="mt-4 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="ingest-url" className={labelClass}>{copy[lang].ingestTitle}</label>
+              <input id="ingest-url" type="url" required placeholder="https://example.org/opportunity"
+                value={ingestUrl} onChange={event => setIngestUrl(event.target.value)} className={`${fieldClass} mt-1`} />
+              <p className="mt-1 text-xs text-slate-500">{copy[lang].ingestHint}</p>
+            </div>
+            <button type="submit" disabled={ingesting}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
+              {ingesting && <Loader2 aria-hidden className="h-4 w-4 animate-spin" />} {copy[lang].ingestCta(ingesting)}
+            </button>
+          </form>
 
           {showListingForm && (
             <form onSubmit={publish} className="mt-4 space-y-3 rounded-xl border border-brand-200 bg-brand-50/50 p-5">
@@ -462,6 +640,17 @@ export default function Workspace() {
               <p className="text-xs text-slate-500">
                 Submissions are marked unverified. Add an HTTPS source URL so others can check the original.
               </p>
+              {draft && (
+                <div className="rounded-lg border border-slate-300 bg-white p-3 text-xs text-slate-700">
+                  <p className="font-semibold">AI draft from source · confidence: {draft.confidence}</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {draft.evidence.map((item, index) => (
+                      <li key={index}><span className="font-medium">{item.field}:</span> “{item.quote}”</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 italic text-slate-500">Review every field below before publishing. Quotes must match the source.</p>
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="l-title" className={labelClass}>Title</label>
@@ -559,6 +748,108 @@ export default function Workspace() {
           Demo listings are explicitly fictional and labelled. User submissions are unverified. Your data stays in a private guest session.
         </p>
       </footer>
+    </div>
+  );
+}
+
+function AuthPanel({ lang, onAuthed, onError }: {
+  lang: Lang;
+  onAuthed: (email: string) => void | Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const [mode, setMode] = useState<'signin' | 'signup' | 'recover'>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryIssued, setRecoveryIssued] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true); onError('');
+    try {
+      if (mode === 'signup') {
+        const result = await api<{ email: string; recoveryCode: string }>('/api/auth/sign-up', {
+          method: 'POST', body: JSON.stringify({ email, password })
+        });
+        setRecoveryIssued(result.recoveryCode);
+        await onAuthed(result.email);
+      } else if (mode === 'signin') {
+        const result = await api<{ email: string }>('/api/auth/sign-in', {
+          method: 'POST', body: JSON.stringify({ email, password })
+        });
+        await onAuthed(result.email);
+      } else {
+        const result = await api<{ recoveryCode: string }>('/api/auth/recover', {
+          method: 'POST', body: JSON.stringify({ email, recoveryCode, password })
+        });
+        setRecoveryIssued(result.recoveryCode);
+        setMode('signin');
+      }
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : 'Authentication failed.');
+    } finally { setBusy(false); }
+  };
+
+  const labels = {
+    signin: { title: 'Sign in', action: 'Sign in', switch: 'New here? Create an account' },
+    signup: { title: 'Create account', action: 'Create account', switch: 'Already registered? Sign in' },
+    recover: { title: 'Reset password', action: 'Reset with recovery code', switch: 'Back to sign in' },
+  }[mode];
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+      <div className="max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900">{labels.title}</h2>
+          <button type="button" onClick={() => setMode(mode === 'recover' ? 'signin' : 'recover')}
+            className="text-xs font-medium text-brand-700 hover:underline">
+            {mode === 'recover' ? 'Back to sign in' : 'Forgot password?'}
+          </button>
+        </div>
+        {recoveryIssued && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-inset ring-amber-200">
+            Save this recovery code now — it is shown only once: <strong className="font-mono">{recoveryIssued}</strong>
+          </p>
+        )}
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <div>
+            <label htmlFor="auth-email" className="block text-xs font-medium text-slate-700">Email</label>
+            <input id="auth-email" type="email" required autoComplete="email" value={email}
+              onChange={event => setEmail(event.target.value)}
+              className="mt-1 w-full rounded-lg border-slate-300 text-sm" />
+          </div>
+          {mode === 'recover' && (
+            <div>
+              <label htmlFor="auth-code" className="block text-xs font-medium text-slate-700">Recovery code</label>
+              <input id="auth-code" required value={recoveryCode} onChange={event => setRecoveryCode(event.target.value)}
+                className="mt-1 w-full rounded-lg border-slate-300 font-mono text-sm" placeholder="XXXX-XXXX-XXXX" />
+            </div>
+          )}
+          <div>
+            <label htmlFor="auth-password" className="block text-xs font-medium text-slate-700">
+              {mode === 'recover' ? 'New password' : 'Password'}
+            </label>
+            <input id="auth-password" type="password" required minLength={10} autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              value={password} onChange={event => setPassword(event.target.value)}
+              className="mt-1 w-full rounded-lg border-slate-300 text-sm" />
+            {mode !== 'signin' && <p className="mt-1 text-xs text-slate-500">At least 10 characters.</p>}
+          </div>
+          <button type="submit" disabled={busy}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+            {busy && <Loader2 aria-hidden className="h-4 w-4 animate-spin" />} {labels.action}
+          </button>
+        </form>
+        <button type="button" onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); onError(''); }}
+          className="mt-3 text-xs font-medium text-slate-600 hover:underline">
+          {labels.switch}
+        </button>
+        <p className="mt-2 text-xs text-slate-500">
+          {lang === 'en'
+            ? 'No email is sent. Recovery uses the one-time code shown at sign-up.'
+            : 'कोई ईमेल नहीं भेजा जाता। रिकवरी साइन-अप पर दिखाए गए वन-टाइम कोड से होती है।'}
+        </p>
+      </div>
     </div>
   );
 }

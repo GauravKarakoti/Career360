@@ -5,14 +5,26 @@ datasource db {
   provider = "postgresql"
   url = env("DATABASE_URL")
 }
+model Account {
+  id String @id @default(cuid())
+  email String @unique
+  passwordHash String
+  recoveryCodeHash String
+  createdAt DateTime @default(now())
+  workspaces Workspace[]
+}
 model Workspace {
   id String @id @default(cuid())
   tokenHash String @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+  accountId String?
+  account Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
   profile Profile?
   saved SavedOpportunity[]
   listings Opportunity[]
+  sentRequests ConnectionRequest[] @relation("fromWorkspace")
+  receivedRequests ConnectionRequest[] @relation("toWorkspace")
 }
 model Profile {
   id String @id @default(cuid())
@@ -20,6 +32,7 @@ model Profile {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name String
   role String
+  roles String[]
   industry String
   location String
   description String
@@ -27,6 +40,7 @@ model Profile {
   interests String @default("")
   constraints String @default("")
   goals String @default("")
+  visibility String @default("private")
   capabilities Capability[]
   needs Need[]
   updatedAt DateTime @updatedAt
@@ -56,6 +70,7 @@ model Opportunity {
   requirements String[]
   offers String[]
   sourceUrl String?
+  evidence Json?
   publishedAt DateTime @default(now())
   deadline DateTime?
   isDemo Boolean @default(false)
@@ -73,4 +88,18 @@ model SavedOpportunity {
   createdAt DateTime @default(now())
   @@id([workspaceId, opportunityId])
   @@index([opportunityId])
+}
+model ConnectionRequest {
+  id String @id @default(cuid())
+  fromWorkspaceId String
+  toWorkspaceId String
+  fromWorkspace Workspace @relation("fromWorkspace", fields: [fromWorkspaceId], references: [id], onDelete: Cascade)
+  toWorkspace Workspace @relation("toWorkspace", fields: [toWorkspaceId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  message String @default("")
+  status String @default("pending")
+  createdAt DateTime @default(now())
+  respondedAt DateTime?
+  @@index([toWorkspaceId, status])
+  @@index([fromWorkspaceId, status])
 }
