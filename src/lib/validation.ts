@@ -4,7 +4,7 @@ export const categories = ['Partnerships', 'Funding', 'Jobs & internships', 'Eve
 const text = z.string().trim().min(1).max(160);
 const terms = z.array(z.string().trim().min(1).max(80)).min(1).max(20).transform(items => [...new Map(items.map(item => [item.toLocaleLowerCase(), item])).values()]);
 const email = z.string().trim().toLowerCase().email().max(200);
-const password = z.string().min(10).max(200);
+const password = z.string().min(8).max(200);
 export const signUpInput = z.object({ email, password, role: z.enum(roles) });
 export const signInInput = z.object({ email, password });
 export const recoverInput = z.object({ email, recoveryCode: z.string().trim().min(10).max(20), password });

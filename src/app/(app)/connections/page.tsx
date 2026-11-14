@@ -16,11 +16,16 @@ export default function ConnectionsPage() {
   const [sending, setSending] = useState(false);
 
   const loadConnections = useCallback(async () => {
-    try { setConnections(await api<Connections>('/api/connections')); }
-    catch (caught) { flash(caught instanceof Error ? caught.message : 'Could not load connection requests.'); }
+    try {
+      setConnections(await api<Connections>('/api/connections'));
+    } catch (caught) {
+      flash(caught instanceof Error ? caught.message : 'Could not load connection requests.');
+    }
   }, [flash]);
 
-  useEffect(() => { void loadConnections(); }, [loadConnections]);
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
 
   const respond = async (id: string, status: 'accepted' | 'declined') => {
     try {
@@ -33,6 +38,10 @@ export default function ConnectionsPage() {
   };
 
   const openChat = async (requestId: string) => {
+    if (openThread === requestId) {
+      setOpenThread(null);
+      return;
+    }
     setOpenThread(requestId);
     try {
       const thread = await api<{ messages: typeof threadMessages }>(`/api/messages?requestId=${requestId}`);
@@ -56,19 +65,88 @@ export default function ConnectionsPage() {
 
   const sendRequest = async (event: React.FormEvent) => {
     event.preventDefault();
+    const target = contactTo.trim();
+    if (!target) return;
+
     setSending(true);
     try {
+      const payload = target.includes('@')
+        ? { toEmail: target, message: contactMessage.trim() || undefined }
+        : { toWorkspaceId: target, message: contactMessage.trim() || undefined };
+
       await api('/api/connections', {
         method: 'POST',
-        body: JSON.stringify({ toEmail: contactTo.trim(), message: contactMessage.trim() || undefined }),
+        body: JSON.stringify(payload)
       });
-      setContactTo(''); setContactMessage('');
+      setContactTo('');
+      setContactMessage('');
       await loadConnections();
       flash('Connection request sent.');
     } catch (caught) {
       flash(caught instanceof Error ? caught.message : 'Could not send the request.');
-    } finally { setSending(false); }
+    } finally {
+      setSending(false);
+    }
   };
+
+  const renderChatSection = (requestId: string) => (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => openChat(requestId)}
+        aria-expanded={openThread === requestId}
+        className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+      >
+        {openThread === requestId ? 'Hide chat' : 'Open chat'}
+      </button>
+      {openThread === requestId && (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <ul className="space-y-1.5">
+            {threadMessages.length ? (
+              threadMessages.map((message) => (
+                <li
+                  key={message.id}
+                  className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs ${
+                    message.mine
+                      ? 'ml-auto bg-brand-600 text-white'
+                      : 'bg-white text-slate-800 ring-1 ring-inset ring-slate-200'
+                  }`}
+                >
+                  {message.body}
+                </li>
+              ))
+            ) : (
+              <li className="text-xs text-slate-500">No messages yet. Say hello.</li>
+            )}
+          </ul>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void sendMessage(requestId);
+            }}
+            className="mt-2 flex gap-2"
+          >
+            <label className="sr-only" htmlFor={`msg-${requestId}`}>
+              Message
+            </label>
+            <input
+              id={`msg-${requestId}`}
+              value={draftMessage}
+              onChange={(event) => setDraftMessage(event.target.value)}
+              placeholder="Write a message…"
+              className="flex-1 rounded-lg border-slate-300 text-xs"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              Send
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -77,23 +155,46 @@ export default function ConnectionsPage() {
         <h1 className="text-xl font-bold text-slate-900">{t('Connections', 'कनेक्शन')}</h1>
       </div>
       <p className="mt-1 max-w-2xl text-sm text-slate-500">
-        {t('Only discoverable profiles can be contacted. Private senders appear as “Private profile”.',
-          'केवल खोजे जा सकने वाले प्रोफ़ाइल से संपर्क किया जा सकता है। निजी भेजने वाले “Private profile” दिखते हैं।')}
+        {t(
+          'Only discoverable profiles can be contacted. Private senders appear as “Private profile”.',
+          'केवल खोजे जा सकने वाले प्रोफ़ाइल से संपर्क किया जा सकता है। निजी भेजने वाले “Private profile” दिखते हैं।'
+        )}
       </p>
 
-      <form onSubmit={sendRequest} className="mt-4 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4">
+      <form
+        onSubmit={sendRequest}
+        className="mt-4 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-4"
+      >
         <div>
-          <label htmlFor="c-email" className="block text-sm font-medium text-slate-700">Email of a discoverable user</label>
-          <input id="c-email" type="email" required value={contactTo}
-            onChange={event => setContactTo(event.target.value)} className="mt-1 w-56 rounded-lg border-slate-300 text-sm" />
+          <label htmlFor="c-email" className="block text-sm font-medium text-slate-700">
+            Email of a discoverable user
+          </label>
+          <input
+            id="c-email"
+            type="email"
+            required
+            value={contactTo}
+            onChange={(event) => setContactTo(event.target.value)}
+            className="mt-1 w-56 rounded-lg border-slate-300 text-sm"
+          />
         </div>
         <div className="min-w-0 flex-1">
-          <label htmlFor="c-msg" className="block text-sm font-medium text-slate-700">Message (optional)</label>
-          <input id="c-msg" maxLength={500} value={contactMessage}
-            onChange={event => setContactMessage(event.target.value)} className="mt-1 w-full rounded-lg border-slate-300 text-sm" />
+          <label htmlFor="c-msg" className="block text-sm font-medium text-slate-700">
+            Message (optional)
+          </label>
+          <input
+            id="c-msg"
+            maxLength={500}
+            value={contactMessage}
+            onChange={(event) => setContactMessage(event.target.value)}
+            className="mt-1 w-full rounded-lg border-slate-300 text-sm"
+          />
         </div>
-        <button type="submit" disabled={sending}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={sending}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+        >
           {sending ? 'Sending…' : 'Send request'}
         </button>
       </form>
@@ -103,61 +204,59 @@ export default function ConnectionsPage() {
           <h2 className="font-semibold text-slate-900">Received</h2>
           {connections?.received.length ? (
             <ul className="mt-2 space-y-2">
-              {connections.received.map(item => (
+              {connections.received.map((item) => (
                 <li key={item.id} className="rounded-lg border border-slate-200 p-3">
                   <p className="font-medium">{item.from.name}</p>
                   {item.message && <p className="mt-0.5 text-xs text-slate-600">“{item.message}”</p>}
                   {item.status === 'pending' ? (
                     <div className="mt-2 flex gap-2">
-                      <button type="button" onClick={() => respond(item.id, 'accepted')}
-                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Accept</button>
-                      <button type="button" onClick={() => respond(item.id, 'declined')}
-                        className="rounded-lg px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">Decline</button>
+                      <button
+                        type="button"
+                        onClick={() => respond(item.id, 'accepted')}
+                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => respond(item.id, 'declined')}
+                        className="rounded-lg px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+                      >
+                        Decline
+                      </button>
                     </div>
                   ) : item.status === 'accepted' ? (
-                    <div className="mt-2">
-                      <button type="button" onClick={() => openChat(item.id)} aria-expanded={openThread === item.id}
-                        className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700">
-                        {openThread === item.id ? 'Hide chat' : 'Open chat'}
-                      </button>
-                      {openThread === item.id && (
-                        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                          <ul className="space-y-1.5">
-                            {threadMessages.length
-                              ? threadMessages.map(message => (
-                                  <li key={message.id} className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs ${message.mine ? 'ml-auto bg-brand-600 text-white' : 'bg-white text-slate-800 ring-1 ring-inset ring-slate-200'}`}>
-                                    {message.body}
-                                  </li>
-                                ))
-                              : <li className="text-xs text-slate-500">No messages yet. Say hello.</li>}
-                          </ul>
-                          <form onSubmit={event => { event.preventDefault(); sendMessage(item.id); }} className="mt-2 flex gap-2">
-                            <label className="sr-only" htmlFor={`msg-${item.id}`}>Message</label>
-                            <input id={`msg-${item.id}`} value={draftMessage} onChange={event => setDraftMessage(event.target.value)}
-                              placeholder="Write a message…" className="flex-1 rounded-lg border-slate-300 text-xs" />
-                            <button type="submit" className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800">Send</button>
-                          </form>
-                        </div>
-                      )}
-                    </div>
-                  ) : <p className="mt-1 text-xs capitalize text-slate-500">{item.status}</p>}
+                    renderChatSection(item.id)
+                  ) : (
+                    <p className="mt-1 text-xs capitalize text-slate-500">{item.status}</p>
+                  )}
                 </li>
               ))}
             </ul>
-          ) : <p className="mt-2 text-xs text-slate-500">No requests yet.</p>}
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">No requests yet.</p>
+          )}
         </section>
+
         <section className="rounded-xl border border-slate-200 bg-white p-5 text-sm">
           <h2 className="font-semibold text-slate-900">Sent</h2>
           {connections?.sent.length ? (
             <ul className="mt-2 space-y-2">
-              {connections.sent.map(item => (
+              {connections.sent.map((item) => (
                 <li key={item.id} className="rounded-lg border border-slate-200 p-3">
                   <p className="font-medium">{item.to.name}</p>
-                  <p className="mt-0.5 text-xs capitalize text-slate-500">{item.status}</p>
+                  {item.message && <p className="mt-0.5 text-xs text-slate-600">“{item.message}”</p>}
+                  {item.status === 'accepted' ? (
+                    renderChatSection(item.id)
+                  ) : (
+                    <p className="mt-0.5 text-xs capitalize text-slate-500">{item.status}</p>
+                  )}
                 </li>
               ))}
             </ul>
-          ) : <p className="mt-2 text-xs text-slate-500">Nothing sent yet.</p>}
+          ) : (
+            <p className="mt-2 text-xs text-slate-500">Nothing sent yet.</p>
+          )}
         </section>
       </div>
     </main>
