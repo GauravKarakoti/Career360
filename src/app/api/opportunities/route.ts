@@ -5,6 +5,7 @@ import { match } from '@/lib/matching';
 import { ApiError, handle, jsonBody, signedInAccount, workspace } from '@/lib/session';
 import { opportunityInput } from '@/lib/validation';
 import { syncOpportunitiesForDna } from '@/lib/web-discovery';
+import { localizeListings, parseLang } from '@/lib/translate';
 
 const ROLE_ALLOWED_CATEGORIES: Record<string, readonly string[]> = {
   Candidate: ['Collaborations', 'Learning'],
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
     const session = await workspace();
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim().slice(0, 200);
+    const lang = parseLang(url.searchParams.get('lang'));
 
     const profile = await db().profile.findUnique({
       where: { workspaceId: session.id },
@@ -100,7 +102,10 @@ export async function GET(request: Request) {
       scored.sort((a, b) => (b.match?.score ?? 0) - (a.match?.score ?? 0));
     }
 
-    return { opportunities: scored, query: q || null };
+    // Matching/ranking runs on the canonical text above; translation is display-only.
+    const opportunities = await localizeListings(scored, lang);
+
+    return { opportunities, query: q || null, lang };
   });
 }
 

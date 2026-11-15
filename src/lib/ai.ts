@@ -10,7 +10,7 @@ const baseUrl = (
 // openai/gpt-oss-20b and openai/gpt-oss-120b natively support strict json_schema on Groq.
 const model =
   process.env.GROQ_MODEL ||
-  'openai/gpt-oss-120b';
+  'openai/gpt-oss-20b';
 
 const embedModel =
   process.env.GROQ_EMBED_MODEL ||

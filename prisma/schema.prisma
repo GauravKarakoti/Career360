@@ -153,9 +153,26 @@ model Opportunity {
   owner        Workspace?         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   saved        SavedOpportunity[]
   trackers     Tracker[]
+  translations OpportunityTranslation[]
 
   @@index([ownerId])
   @@index([category])
+}
+
+// Per-language copy of an opportunity's text, generated on demand and shared by all users.
+// sourceHash lets us discard a translation when the original title/description changes.
+model OpportunityTranslation {
+  opportunityId String
+  lang          String
+  title         String
+  description   String
+  requirements  String[]
+  offers        String[]
+  sourceHash    String
+  createdAt     DateTime    @default(now())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@id([opportunityId, lang])
 }
 
 model SavedOpportunity {

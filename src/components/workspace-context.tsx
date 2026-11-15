@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   api, splitTerms, EMPTY_FORM, t as tr,
   type Lang, type MsgKey, type Opportunity, type Profile, type ProfileForm,
@@ -39,6 +39,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [lang, setLang] = useState<Lang>('en');
+  const langRef = useRef<Lang>('en');
+  langRef.current = lang;
   const [email, setEmail] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileForm>(EMPTY_FORM);
   const [hasProfile, setHasProfile] = useState(false);
@@ -50,7 +52,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const load = useCallback(async () => {
     try {
       const ws = await api<{ profile: Profile | null; saved: { opportunityId: string }[]; email: string | null; primaryRole: string | null }>('/api/workspace');
-      const feed = await api<{ opportunities: Opportunity[] }>('/api/opportunities');
+      const feed = await api<{ opportunities: Opportunity[] }>(`/api/opportunities?lang=${langRef.current}`);
       if (ws.profile) {
         const p = ws.profile;
         setProfileForm({
@@ -121,12 +123,21 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const refreshOpportunities = useCallback(async (query?: string) => {
     try {
-      const feed = await api<{ opportunities: Opportunity[] }>(`/api/opportunities${query ? `?q=${encodeURIComponent(query)}` : ''}`);
+      const params = new URLSearchParams({ lang: langRef.current });
+      if (query) params.set('q', query);
+      const feed = await api<{ opportunities: Opportunity[] }>(`/api/opportunities?${params}`);
       setOpportunities(feed.opportunities);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Search failed.');
     }
   }, []);
+
+  // Re-fetch listings in the newly chosen language (translations are cached server-side).
+  const firstLang = useRef(true);
+  useEffect(() => {
+    if (firstLang.current) { firstLang.current = false; return; }
+    void refreshOpportunities();
+  }, [lang, refreshOpportunities]);
 
   const signOut = useCallback(async () => {
     try {

@@ -7,7 +7,8 @@
         "build": "prisma generate && next build",
         "start": "next start --hostname 0.0.0.0 --port 3000",
         "db:gen": "prisma generate",
-        "db:migrate": "node scripts/database.mjs migrate",
+        "db:migrate": "prisma migrate dev",
+        "db:migrate:prod": "node scripts/database.mjs migrate",
         "typecheck": "tsc --noEmit",
         "postinstall": "npm run db:gen"
     },

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { aiAvailable, chatJson, schemaOf } from '@/lib/ai';
+import { htmlToMarkdown, markdownToPlain, truncateMarkdown } from '@/lib/rich-text';
 
 export type DnaInput = {
   role: string;
@@ -12,7 +13,6 @@ export type DnaInput = {
   interests?: string;
   constraints?: string;
   goals?: string;
-  preferredLanguage?: 'en' | 'hi';
 };
 
 export type DiscoveredListing = {
@@ -51,26 +51,17 @@ const dnaSyncCache =
   globalForCache.__o360DnaSyncCache ??
   (globalForCache.__o360DnaSyncCache = new Map<string, CacheEntry>());
 
+/** Plain-text version of a description (no HTML, no Markdown). */
 export function cleanHtmlText(raw: string): string {
-  if (!raw) return '';
-  return raw
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<img[^>]*>/gi, ' ')
-    .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
-    .replace(/<\/?[a-z][^>]*>/gi, ' ')
-    .replace(/class="[^"]*"/gi, ' ')
-    .replace(/style="[^"]*"/gi, ' ')
-    .replace(/styles-module__[^\s]+/gi, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&[a-z0-9#]+;/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return markdownToPlain(htmlToMarkdown(raw));
+}
+
+const MAX_DESCRIPTION = 3500;
+
+/** Keeps structure (paragraphs, bullets, headings, bold) instead of flattening to one line. */
+function toDescription(raw: string): { markdown: string; plain: string } {
+  const markdown = truncateMarkdown(htmlToMarkdown(raw), MAX_DESCRIPTION);
+  return { markdown, plain: markdownToPlain(markdown) };
 }
 
 function buildDnaSignature(dna: DnaInput): string {
@@ -80,7 +71,6 @@ function buildDnaSignature(dna: DnaInput): string {
     dna.location.toLowerCase().trim(),
     [...dna.capabilities].map((c) => c.toLowerCase().trim()).sort().join(','),
     [...dna.needs].map((n) => n.toLowerCase().trim()).sort().join(','),
-    (dna.preferredLanguage ?? 'en').toLowerCase(),
   ].join('|');
 }
 
@@ -134,8 +124,8 @@ async function fetchRemotiveOpportunities(
       if (!job.title || !job.company_name || !job.url || !job.url.startsWith('https://')) {
         continue;
       }
-      const cleanDesc = cleanHtmlText(job.description ?? '').slice(0, 1500);
-      if (cleanDesc.length < 40) continue;
+      const { markdown: cleanDesc, plain: plainDesc } = toDescription(job.description ?? '');
+      if (plainDesc.length < 40) continue;
 
       const tags = (job.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 6);
       const offers = [
@@ -157,7 +147,7 @@ async function fetchRemotiveOpportunities(
         sourceUrl: job.url,
         evidence: [
           { field: 'title', quote: job.title.slice(0, 140) },
-          { field: 'description', quote: cleanDesc.slice(0, 200) },
+          { field: 'description', quote: plainDesc.slice(0, 200) },
         ],
         deadline: null,
       });
@@ -229,11 +219,9 @@ async function fetchUnstopOpportunities(
         .filter(Boolean)
         .slice(0, 6);
 
-      const details = cleanHtmlText(String(row.details ?? row.short_desc ?? title));
+      const details = toDescription(String(row.details ?? row.short_desc ?? title));
       const description =
-        details.length >= 30
-          ? details.slice(0, 1500)
-          : `${title} hosted by ${orgName}.`;
+        details.plain.length >= 30 ? details.markdown : `${title} hosted by ${orgName}.`;
 
       const endDateStr = String(row.end_date ?? '');
       const parsedDeadline = endDateStr ? new Date(endDateStr) : null;
@@ -303,8 +291,8 @@ async function fetchArbeitnowOpportunities(
 
     for (const item of selected) {
       if (!item.title || !item.company_name || !item.url?.startsWith('https://')) continue;
-      const cleanDesc = cleanHtmlText(item.description ?? '').slice(0, 1500);
-      if (cleanDesc.length < 40) continue;
+      const { markdown: cleanDesc, plain: plainDesc } = toDescription(item.description ?? '');
+      if (plainDesc.length < 40) continue;
 
       const tags = (item.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 6);
 
@@ -327,7 +315,7 @@ async function fetchArbeitnowOpportunities(
         sourceUrl: item.url,
         evidence: [
           { field: 'title', quote: item.title.slice(0, 140) },
-          { field: 'description', quote: cleanDesc.slice(0, 200) },
+          { field: 'description', quote: plainDesc.slice(0, 200) },
         ],
         deadline: null,
       });
@@ -339,100 +327,114 @@ async function fetchArbeitnowOpportunities(
   }
 }
 
-async function refineAndTranslateListings(
+const REFINE_CHUNK = 4;
+
+/**
+ * Normalises listings to ONE canonical language (English) so the shared cache is
+ * language-neutral; per-user translation happens at read time (see lib/translate.ts).
+ * Descriptions are already structured Markdown, so the model only returns an English
+ * version when the source text is not English, preserving the structure.
+ */
+async function refineListings(
   listings: DiscoveredListing[],
   dna: DnaInput
 ): Promise<DiscoveredListing[]> {
-  if (listings.length === 0) return listings;
-  const targetLang = dna.preferredLanguage ?? 'en';
-  if (!aiAvailable()) return listings;
+  if (listings.length === 0 || !aiAvailable()) return listings;
 
-  try {
-    const batch = listings.slice(0, 6).map((item, idx) => ({
-      idx,
-      title: item.title,
-      organization: item.organization,
-      rawDesc: item.description.slice(0, 800),
-      category: item.category,
-    }));
-
-    const schema = schemaOf(
-      {
-        items: {
-          type: 'array',
-          items: schemaOf(
-            {
-              idx: { type: 'number' },
-              title: { type: 'string' },
-              description: { type: 'string' },
-              category: {
-                type: 'string',
-                enum: [
-                  'Partnerships',
-                  'Funding',
-                  'Jobs & internships',
-                  'Events',
-                  'Collaborations',
-                  'Learning',
-                ],
-              },
-              requirements: { type: 'array', items: { type: 'string' } },
-              offers: { type: 'array', items: { type: 'string' } },
+  const schema = schemaOf(
+    {
+      items: {
+        type: 'array',
+        items: schemaOf(
+          {
+            idx: { type: 'number' },
+            title: { type: 'string' },
+            descriptionEnglish: { type: 'string' },
+            category: {
+              type: 'string',
+              enum: [
+                'Partnerships',
+                'Funding',
+                'Jobs & internships',
+                'Events',
+                'Collaborations',
+                'Learning',
+              ],
             },
-            ['idx', 'title', 'description', 'category', 'requirements', 'offers']
-          ),
-        },
+            requirements: { type: 'array', items: { type: 'string' } },
+            offers: { type: 'array', items: { type: 'string' } },
+          },
+          ['idx', 'title', 'descriptionEnglish', 'category', 'requirements', 'offers']
+        ),
       },
-      ['items']
-    );
+    },
+    ['items']
+  );
 
-    const languageInstruction =
-      targetLang === 'hi'
-        ? 'Translate the cleaned description, title, requirements, and offers into clear, professional Hindi.'
-        : 'Ensure text is clean, professional English.';
+  const refineChunk = async (chunk: DiscoveredListing[]) => {
+    try {
+      const batch = chunk.map((item, idx) => ({
+        idx,
+        title: item.title,
+        organization: item.organization,
+        description: item.description.slice(0, 3000),
+        category: item.category,
+        requirements: item.requirements,
+        offers: item.offers,
+      }));
 
-    const refined = await chatJson<{
-      items: Array<{
-        idx: number;
-        title: string;
-        description: string;
-        category: DiscoveredListing['category'];
-        requirements: string[];
-        offers: string[];
-      }>;
-    }>(
-      [
-        {
-          role: 'system',
-          content: [
-            'You clean and refine raw scraped job/opportunity listings.',
-            'Remove all HTML artefacts, CSS snippets, and formatting noise.',
-            languageInstruction,
-            'Extract accurate, role-specific requirements and genuine offers. NEVER assign generic mismatched tags like "Hackathons" to regular jobs.',
-          ].join(' '),
-        },
-        {
-          role: 'user',
-          content: `Target Language Code: ${targetLang}\nUser DNA Role: ${dna.role}\n\nListings to clean & refine:\n${JSON.stringify(batch)}`,
-        },
-      ],
-      'dna_web_refinement',
-      schema
-    );
+      const refined = await chatJson<{
+        items: Array<{
+          idx: number;
+          title: string;
+          descriptionEnglish: string;
+          category: DiscoveredListing['category'];
+          requirements: string[];
+          offers: string[];
+        }>;
+      }>(
+        [
+          {
+            role: 'system',
+            content: [
+              'You normalise scraped job/opportunity listings to English.',
+              'The description is a Markdown subset ("## " headings, "- " bullets, **bold**, blank-line paragraphs).',
+              'If the description is NOT English, put a faithful English translation in descriptionEnglish with exactly the same structure.',
+              'If it is already English, return an empty string for descriptionEnglish. Never summarise or shorten.',
+              'Translate title, requirements and offers to English if they are not; keep company and technology names as-is.',
+              'Extract accurate, role-specific requirements and genuine offers. NEVER assign generic mismatched tags like "Hackathons" to regular jobs.',
+            ].join(' '),
+          },
+          {
+            role: 'user',
+            content: `User DNA Role: ${dna.role}\n\nListings:\n${JSON.stringify(batch)}`,
+          },
+        ],
+        'dna_web_refinement',
+        schema
+      );
 
-    for (const entry of refined.items ?? []) {
-      const target = listings[entry.idx];
-      if (!target) continue;
-      if (entry.title) target.title = entry.title.slice(0, 160);
-      if (entry.description) target.description = entry.description.slice(0, 2000);
-      if (entry.category) target.category = entry.category;
-      if (entry.requirements?.length) target.requirements = entry.requirements.slice(0, 8);
-      if (entry.offers?.length) target.offers = entry.offers.slice(0, 6);
+      for (const entry of refined.items ?? []) {
+        const target = chunk[entry.idx];
+        if (!target) continue;
+        if (entry.title?.trim()) target.title = entry.title.trim().slice(0, 160);
+        if (entry.descriptionEnglish?.trim()) {
+          target.description = truncateMarkdown(entry.descriptionEnglish.trim(), MAX_DESCRIPTION);
+        }
+        if (entry.category) target.category = entry.category;
+        if (entry.requirements?.length) target.requirements = entry.requirements.slice(0, 8);
+        if (entry.offers?.length) target.offers = entry.offers.slice(0, 6);
+      }
+    } catch {
+      // Keep the converted-but-unrefined listings for this chunk.
     }
-  } catch {
-    // Keep base listings on timeout
-  }
+  };
 
+  const jobs: Promise<void>[] = [];
+  for (let i = 0; i < listings.length; i += REFINE_CHUNK) {
+    jobs.push(refineChunk(listings.slice(i, i + REFINE_CHUNK)));
+  }
+  await Promise.all(jobs);
   return listings;
 }
 
@@ -480,7 +482,7 @@ export async function syncOpportunitiesForDna(
     }
   }
 
-  const discovered = await refineAndTranslateListings(Array.from(byUrl.values()), dna);
+  const discovered = await refineListings(Array.from(byUrl.values()), dna);
 
   let created = 0;
   let reused = 0;
@@ -494,10 +496,21 @@ export async function syncOpportunitiesForDna(
             { title: item.title, organization: item.organization },
           ],
         },
-        select: { id: true },
+        select: { id: true, description: true, sourceUrl: true },
       });
 
       if (existing) {
+        // Upgrade legacy rows that were stored flattened (no paragraph/bullet structure).
+        if (
+          existing.sourceUrl === item.sourceUrl &&
+          !existing.description.includes('\n') &&
+          item.description.includes('\n')
+        ) {
+          await db().opportunity.update({
+            where: { id: existing.id },
+            data: { description: item.description },
+          });
+        }
         reused += 1;
         continue;
       }

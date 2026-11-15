@@ -384,7 +384,7 @@ export default function DiscoverPage() {
             <div>
               <p className="text-xs font-bold text-slate-900">{policyCopy.webSyncTitle}</p>
               <p className="text-xs text-slate-600">
-                {policyCopy.webSyncSub(webListingsCount, opportunities.length, servedFromCache)}
+                {policyCopy.webSyncSub(opportunities.length, servedFromCache)}
               </p>
             </div>
           </div>

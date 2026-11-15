@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink } from 'lucide-react';
 import type { MatchResult, Opportunity } from '@/lib/client-api';
 import { useWorkspace } from '@/components/workspace-context';
+import { RichDescription } from '@/components/rich-description';
 
 export const fieldClass =
   'mt-1 w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
@@ -184,7 +185,7 @@ export function OpportunityCard({
           </span>
         )}
       </div>
-      <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-slate-700">{item.description}</p>
+      <RichDescription text={item.description} />
       <div className="mt-3 space-y-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold text-emerald-700">{t('card.offers')}</span>
