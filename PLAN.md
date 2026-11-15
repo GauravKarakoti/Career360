@@ -1,4 +1,4 @@
-# Career360 — implementation plan
+# Career360 - implementation plan
 
 ## Goal and users
 Build the selected Opportunity Workspace for founders, candidates and other stakeholders. Working means a visitor can save a private structured Opportunity DNA profile, discover database-backed opportunities, inspect transparent mutual-fit reasoning and source limitations, and save an opportunity across reloads.
@@ -6,7 +6,7 @@ Build the selected Opportunity Workspace for founders, candidates and other stak
 ## Scope
 This run implements Phase 1 only: the real data-to-action foundation, not the entire hackathon MVP. Include all stakeholder types in the DNA editor, a responsive dashboard, editable DNA, opportunity creation, search/category filters, deterministic mutual matching, gap inspection, source transparency and saved activity. Use explicitly labeled fictional demo listings from a seed script.
 
-Out of scope in Phase 1: account sign-in, public profiles, multi-user connection delivery, generated AI answers, resume extraction, semantic embeddings, Hindi/Hinglish understanding, automatic source verification, market forecasts, chat, uploads and outcome analytics. Do not imply these are active.
+Out of scope in Phase 1: account sign-in, public profiles, multi-user connection delivery, generated AI answers, resume extraction, semantic embeddings, Hindi understanding, automatic source verification, market forecasts, chat, uploads and outcome analytics. Do not imply these are active.
 
 ## Design brief
 - For: founders, candidates and collaborators looking for complementary capabilities.
@@ -47,7 +47,7 @@ Acceptance: save a startup DNA through the UI, reload to recover it from Postgre
 ## Phase 2: Authenticated multilingual intelligence
 Connect identity, confirmed AI extraction and bilingual intelligence without overstating evidence.
 - [x] Add recoverable authenticated accounts, multi-role selection and consent-based profile visibility.
-- [x] Integrate configurable LLM/embedding providers with structured outputs, confirmation and English/Hindi/Hinglish interactions.
+- [x] Integrate configurable LLM/embedding providers with structured outputs, confirmation and English/Hindi interactions.
 - [x] Add source ingestion, evidence comparisons and mandatory/preferred gap bridges with real learning sources.
 - [x] Implement recipient-owned accept/decline connection requests and activity transitions.
 Acceptance: a startup and candidate can use the specified multilingual MVP flows against real or clearly labeled demo opportunities, with source evidence and real connection recipients.
@@ -66,7 +66,7 @@ Harden the system for public production and larger organizations.
 Acceptance: monitored, recoverable production deployment with reviewed privacy and operational controls.
 
 ### Phase 4 delivered
-- `Organization` (admin-key verification, one-time key shown at creation, sha256+timingSafeEqual check), `OrgMembership` (owner/admin/member ranks), `OrgDocument` (members/admins access levels), `AuditLog` (append-only, indexed) — additive migration `20261114100000_phase4_organizations`.
+- `Organization` (admin-key verification, one-time key shown at creation, sha256+timingSafeEqual check), `OrgMembership` (owner/admin/member ranks), `OrgDocument` (members/admins access levels), `AuditLog` (append-only, indexed) - additive migration `20261114100000_phase4_organizations`.
 - APIs under `/api/organizations` (list/create, detail with role-scoped visibility, members add/role-change/remove, verify, documents, audit read) plus `/api/export?kind=trackers|audit&orgId=…` CSV downloads.
 - Abuse controls: per-route rate limits (auth 10/min, ingest 8/min, connections 15/min, messages 30/min, org mutations 5–20/min) enforced inside `handle` so they return 429.
 - `/organizations` page with verification badges, member management, secure documents and audit trail; nav entry in the app shell; Marathi (मराठी) as third UI language with Hindi fallback.

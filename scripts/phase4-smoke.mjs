@@ -79,7 +79,7 @@ const main = async () => {
   const csvDenied = await member.call('/api/export?kind=audit&orgId=' + orgId);
   ok(csvDenied.status === 403, 'audit CSV denied to non-admin (403)');
 
-  // 8. Rate limit on sign-in (10/min) — attempt 12
+  // 8. Rate limit on sign-in (10/min) - attempt 12
   let got429 = false;
   for (let i = 0; i < 12; i++) {
     const r = await outsider.call('/api/auth/sign-in', { method: 'POST', body: JSON.stringify({ email: 'nobody@example.com', password: 'wrong' }) });

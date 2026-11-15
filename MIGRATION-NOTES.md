@@ -1,4 +1,4 @@
-# Phase 2 migration notes — Authenticated multilingual intelligence
+# Phase 2 migration notes - Authenticated multilingual intelligence
 
 ## What moved
 Guest-only cookie sessions (Phase 1) now coexist with recoverable accounts.
@@ -16,7 +16,7 @@ deploy with no backfill needed.
 - First-visit load order (workspace session before opportunities fetch).
 
 ## Phase boundaries and order
-1. Schema migration (additive) — app still works as guests. Done.
+1. Schema migration (additive) - app still works as guests. Done.
 2. Accounts lib + auth API routes. Done.
 3. AI provider with structured outputs + graceful degradation. Done.
 4. Ingestion with evidence + confirm-before-publish. Done.
@@ -35,7 +35,7 @@ account, deleting only superseded guest workspaces of the same account.
 and (only if the columns must go too) drop them in a new migration. Because
 everything added is nullable or a new table, reverting the code alone is safe.
 
-## Phase 3 — Collaboration and source-backed impact (2026-11-14)
+## Phase 3 - Collaboration and source-backed impact (2026-11-14)
 Additive migration `20261114084803_phase3_collaboration_metrics`:
 `Message` (threads on accepted connections), `Tracker` (applications/leads,
 stages identified→applied→in conversation→committed→closed), `ActivityEvent`

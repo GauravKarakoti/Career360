@@ -2,135 +2,208 @@
 
 import Link from 'next/link';
 import { ChevronRight, Compass, Dna, MessagesSquare, Radar, Users } from 'lucide-react';
+import { type MsgKey } from '@/lib/client-api';
 import { useWorkspace } from '@/components/workspace-context';
 
-type RoleCopy = { headline: string; sub: string; primary: { href: string; label: string }; focus: string[] };
+type RoleKeyConfig = {
+  labelKey: MsgKey;
+  headlineKey: MsgKey;
+  subKey: MsgKey;
+  primaryHref: string;
+  primaryLabelKey: MsgKey;
+  focusKeys: [MsgKey, MsgKey, MsgKey];
+};
 
-const ROLE_COPY: Record<string, RoleCopy> = {
+const ROLE_CONFIG: Record<string, RoleKeyConfig> = {
   Candidate: {
-    headline: 'Find the roles that fit what you already know.',
-    sub: 'Compare your skills with live requirements, bridge the gaps and track every application to a decision.',
-    primary: { href: '/discover', label: 'Browse opportunities' },
-    focus: ['Internships and jobs ranked by skill overlap', 'Skill Bridge flags what is missing', 'Application tracker from saved to selected'],
+    labelKey: 'dashboard.role.Candidate.label',
+    headlineKey: 'dashboard.role.Candidate.headline',
+    subKey: 'dashboard.role.Candidate.sub',
+    primaryHref: '/discover',
+    primaryLabelKey: 'dashboard.role.Candidate.primary',
+    focusKeys: [
+      'dashboard.role.Candidate.focus1',
+      'dashboard.role.Candidate.focus2',
+      'dashboard.role.Candidate.focus3',
+    ],
   },
   Startup: {
-    headline: 'Find investors, mentors and your first customers.',
-    sub: 'Your DNA states what you offer and what you need — matches explain the mutual value on both sides.',
-    primary: { href: '/discover', label: 'Find investors & partners' },
-    focus: ['Investor and accelerator listings with sources', 'Mutual Match explains why both sides benefit', 'Track every lead from identified to committed'],
+    labelKey: 'dashboard.role.Startup.label',
+    headlineKey: 'dashboard.role.Startup.headline',
+    subKey: 'dashboard.role.Startup.sub',
+    primaryHref: '/discover',
+    primaryLabelKey: 'dashboard.role.Startup.primary',
+    focusKeys: [
+      'dashboard.role.Startup.focus1',
+      'dashboard.role.Startup.focus2',
+      'dashboard.role.Startup.focus3',
+    ],
   },
   Recruiter: {
-    headline: 'Reach talent whose capabilities match your openings.',
-    sub: 'Publish roles with evidence-backed requirements and connect with discoverable profiles.',
-    primary: { href: '/discover', label: 'Publish a role' },
-    focus: ['Listings with verbatim source evidence', 'Ranked candidate-side skill overlap', 'Accept requests and start conversations'],
+    labelKey: 'dashboard.role.Recruiter.label',
+    headlineKey: 'dashboard.role.Recruiter.headline',
+    subKey: 'dashboard.role.Recruiter.sub',
+    primaryHref: '/discover',
+    primaryLabelKey: 'dashboard.role.Recruiter.primary',
+    focusKeys: [
+      'dashboard.role.Recruiter.focus1',
+      'dashboard.role.Recruiter.focus2',
+      'dashboard.role.Recruiter.focus3',
+    ],
   },
   Creator: {
-    headline: 'Find brands that need your audience.',
-    sub: 'Sponsorships and collaborations ranked by audience fit, with the brand side explained too.',
-    primary: { href: '/discover', label: 'Find sponsorships' },
-    focus: ['Brand and event collaborations', 'TruthLens evidence on every listing', 'Campaign tracker built in'],
+    labelKey: 'dashboard.role.Creator.label',
+    headlineKey: 'dashboard.role.Creator.headline',
+    subKey: 'dashboard.role.Creator.sub',
+    primaryHref: '/discover',
+    primaryLabelKey: 'dashboard.role.Creator.primary',
+    focusKeys: [
+      'dashboard.role.Creator.focus1',
+      'dashboard.role.Creator.focus2',
+      'dashboard.role.Creator.focus3',
+    ],
   },
   Business: {
-    headline: 'Find customers, suppliers and distribution.',
-    sub: 'Post what you sell and what you need — the matchmaker surfaces complementary businesses.',
-    primary: { href: '/discover', label: 'Find leads & suppliers' },
-    focus: ['Sales leads and supplier discovery', 'Resource Exchange for what you lack', 'Lead tracker from contact to conversion'],
+    labelKey: 'dashboard.role.Business.label',
+    headlineKey: 'dashboard.role.Business.headline',
+    subKey: 'dashboard.role.Business.sub',
+    primaryHref: '/discover',
+    primaryLabelKey: 'dashboard.role.Business.primary',
+    focusKeys: [
+      'dashboard.role.Business.focus1',
+      'dashboard.role.Business.focus2',
+      'dashboard.role.Business.focus3',
+    ],
   },
   'Event organiser': {
-    headline: 'Find sponsors, speakers and collaborators.',
-    sub: 'List your event once; brands and creators see a verified, evidence-backed opportunity.',
-    primary: { href: '/dna', label: 'Build your event DNA' },
-    focus: ['Sponsor and speaker discovery', 'Audience-compatibility matching', 'Partnership tracking'],
+    labelKey: 'dashboard.role.EventOrganiser.label',
+    headlineKey: 'dashboard.role.EventOrganiser.headline',
+    subKey: 'dashboard.role.EventOrganiser.sub',
+    primaryHref: '/dna',
+    primaryLabelKey: 'dashboard.role.EventOrganiser.primary',
+    focusKeys: [
+      'dashboard.role.EventOrganiser.focus1',
+      'dashboard.role.EventOrganiser.focus2',
+      'dashboard.role.EventOrganiser.focus3',
+    ],
   },
   'Sponsor / Brand': {
-    headline: 'Find events and creators worth your budget.',
-    sub: 'Compare audiences, check sources with TruthLens, then reach out in one click.',
-    primary: { href: '/discover', label: 'Find events & creators' },
-    focus: ['Event discovery with verification status', 'Creator audience matching', 'Sponsorship pipeline tracking'],
+    labelKey: 'dashboard.role.SponsorBrand.label',
+    headlineKey: 'dashboard.role.SponsorBrand.headline',
+    subKey: 'dashboard.role.SponsorBrand.sub',
+    primaryHref: '/discover',
+    primaryLabelKey: 'dashboard.role.SponsorBrand.primary',
+    focusKeys: [
+      'dashboard.role.SponsorBrand.focus1',
+      'dashboard.role.SponsorBrand.focus2',
+      'dashboard.role.SponsorBrand.focus3',
+    ],
   },
 };
 
-const FALLBACK = ROLE_COPY.Candidate;
+const FALLBACK = ROLE_CONFIG.Candidate;
 
 export default function DashboardPage() {
   const { hasProfile, savedCount, opportunities, primaryRole, email, t } = useWorkspace();
-  const copy = (primaryRole && ROLE_COPY[primaryRole]) || FALLBACK;
-  const roleLabel = primaryRole ?? 'Opportunity seeker';
+  const config = (primaryRole && ROLE_CONFIG[primaryRole]) || FALLBACK;
+  const roleLabel = primaryRole && ROLE_CONFIG[primaryRole]
+    ? t(ROLE_CONFIG[primaryRole].labelKey)
+    : t('dashboard.defaultRole');
 
   const sections = [
     {
-      href: '/dna', icon: Dna, title: 'Opportunity DNA',
+      href: '/dna',
+      icon: Dna,
+      title: t('dashboard.sec.dna.title'),
       done: hasProfile,
-      body: hasProfile
-        ? 'Your DNA is built. Update your capabilities, needs and goals any time to sharpen matches.'
-        : 'Tell the platform what you offer and what you need. This is the intelligence layer behind every match.',
+      body: hasProfile ? t('dashboard.sec.dna.doneBody') : t('dashboard.sec.dna.todoBody'),
     },
     {
-      href: '/discover', icon: Radar, title: 'Discover',
+      href: '/discover',
+      icon: Radar,
+      title: t('dashboard.sec.discover.title'),
       done: savedCount > 0,
-      body: `${opportunities.length} opportunities in the feed, ${savedCount} saved. Ranked by mutual match, with why-this-match explanations.`,
+      body: `${opportunities.length} ${t('dashboard.sec.discover.inFeed')} ${savedCount} ${t('dashboard.sec.discover.saved')} ${t('dashboard.sec.discover.bodySuffix')}`,
     },
     {
-      href: '/connections', icon: MessagesSquare, title: 'Connections',
+      href: '/connections',
+      icon: MessagesSquare,
+      title: t('dashboard.sec.connections.title'),
       done: false,
-      body: 'Send and answer collaboration requests, then continue the conversation in threads.',
+      body: t('dashboard.sec.connections.body'),
     },
     {
-      href: '/trackers', icon: Users, title: 'Trackers',
+      href: '/trackers',
+      icon: Users,
+      title: t('dashboard.sec.trackers.title'),
       done: false,
-      body: 'Turn any listing into a tracked lead: identified, applied, in conversation, committed, closed.',
+      body: t('dashboard.sec.trackers.body'),
     },
     {
-      href: '/pulse', icon: Compass, title: 'Market Pulse',
+      href: '/pulse',
+      icon: Compass,
+      title: t('dashboard.sec.pulse.title'),
       done: false,
-      body: 'Discovery intent versus achieved outcomes across the last 30 days — counted, not estimated.',
+      body: t('dashboard.sec.pulse.body'),
     },
   ];
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <main className="mx-10 px-4 py-8 sm:px-6">
       <section className="rounded-[10px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-900/[0.03] sm:p-10">
         <p className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-700 ring-1 ring-inset ring-brand-200">
-          Career360 · {roleLabel} dashboard
+          Career360 · {roleLabel} {t('dashboard.badgeSuffix')}
         </p>
         <h1 className="mt-3 max-w-2xl text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
-          {copy.headline}
+          {t(config.headlineKey)}
         </h1>
-        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600">{copy.sub}</p>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600">
+          {t(config.subKey)}
+        </p>
         {!hasProfile && (
           <p className="mt-4 inline-flex rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
-            First step: build your Opportunity DNA — every match depends on it.
+            {t('dashboard.firstStep')}
           </p>
         )}
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href={hasProfile ? copy.primary.href : '/dna'}
-            className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-600/25 transition hover:bg-brand-700">
-            {hasProfile ? copy.primary.label : 'Build my Opportunity DNA'} <ChevronRight aria-hidden className="h-4 w-4" />
+          <Link
+            href={hasProfile ? config.primaryHref : '/dna'}
+            className="inline-flex items-center gap-2 rounded-[10px] bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-600/25 transition hover:bg-brand-700"
+          >
+            {hasProfile ? t(config.primaryLabelKey) : t('dashboard.buildDnaCta')}{' '}
+            <ChevronRight aria-hidden className="h-4 w-4" />
           </Link>
-          <Link href="/pulse"
-            className="inline-flex items-center gap-2 rounded-[10px] bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 hover:text-ink">
-            See Market Pulse
+          <Link
+            href="/pulse"
+            className="inline-flex items-center gap-2 rounded-[10px] bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 hover:text-ink"
+          >
+            {t('dashboard.seePulse')}
           </Link>
         </div>
         <ul className="mt-6 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
-          {copy.focus.map(item => (
-            <li key={item} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-inset ring-slate-200">
-              <ChevronRight aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" /> {item}
+          {config.focusKeys.map((key) => (
+            <li
+              key={key}
+              className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-inset ring-slate-200"
+            >
+              <ChevronRight aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" /> {t(key)}
             </li>
           ))}
         </ul>
       </section>
 
       <section aria-label="Workspace sections" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {sections.map(entry => (
-          <Link key={entry.href} href={entry.href}
-            className="group flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-brand-300 hover:shadow">
+        {sections.map((entry) => (
+          <Link
+            key={entry.href}
+            href={entry.href}
+            className="group flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-brand-300 hover:shadow"
+          >
             <div className="flex items-center justify-between">
               <entry.icon aria-hidden className="h-5 w-5 text-brand-600" />
               {entry.done && (
                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                  Started
+                  {t('dashboard.started')}
                 </span>
               )}
             </div>
@@ -143,7 +216,9 @@ export default function DashboardPage() {
         ))}
       </section>
 
-      <p className="mt-6 text-center text-xs text-slate-400">Signed in as {email} · role {roleLabel}</p>
+      <p className="mt-6 text-center text-xs text-slate-400">
+        {t('dashboard.signedInAs')} {email} · {t('dashboard.rolePrefix')} {roleLabel}
+      </p>
     </main>
   );
 }

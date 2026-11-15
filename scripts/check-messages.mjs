@@ -12,7 +12,7 @@ const en = load('en');
 const enKeys = Object.keys(en).sort();
 const problems = [];
 
-for (const locale of ['hi', 'mr']) {
+for (const locale of ['hi']) {
   const catalog = load(locale);
   const keys = Object.keys(catalog).sort();
   const missing = enKeys.filter((key) => !(key in catalog));
@@ -27,7 +27,7 @@ for (const locale of ['hi', 'mr']) {
 }
 
 // ICU plural catalogs must offer an `other` case so any count renders.
-for (const [locale, catalog] of Object.entries({ en, hi: load('hi'), mr: load('mr') })) {
+for (const [locale, catalog] of Object.entries({ en, hi: load('hi') })) {
   for (const [key, value] of Object.entries(catalog)) {
     if (value.includes('{count, plural') && !/(?:^|[ ])other\s*\{/.test(value)) {
       problems.push(`${locale}: ${key} has an ICU plural without an "other" case`);
@@ -39,4 +39,4 @@ if (problems.length) {
   console.error(`i18n catalog check failed:\n${problems.map((line) => `  - ${line}`).join('\n')}`);
   process.exit(1);
 }
-console.log(`i18n catalog check passed: ${enKeys.length} keys; en complete, hi complete, mr falls back to hi.`);
+console.log(`i18n catalog check passed: ${enKeys.length} keys; en complete, hi complete.`);

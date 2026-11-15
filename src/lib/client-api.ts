@@ -79,19 +79,17 @@ export const EMPTY_LISTING: ListingForm = {
   description: '', requirements: '', preferred: '', offers: '', sourceUrl: '', deadline: '',
 };
 
-export type Lang = 'en' | 'hi' | 'mr';
+export type Lang = 'en' | 'hi';
 import enMessages from '@/messages/en.json';
 import hiMessages from '@/messages/hi.json';
-import mrMessages from '@/messages/mr.json';
 
 export type MsgKey = keyof typeof enMessages;
 export const LANGS: { id: Lang; label: string }[] = [
-  { id: 'en', label: 'English' }, { id: 'hi', label: 'हिंदी' }, { id: 'mr', label: 'मराठी' },
+  { id: 'en', label: 'English' }, { id: 'hi', label: 'हिंदी' }
 ];
 export const messages = {
   en: enMessages as Record<MsgKey, string>,
   hi: hiMessages as Record<MsgKey, string>,
-  mr: mrMessages as Partial<Record<MsgKey, string>>,
 };
 
 // Message catalogs live in src/messages/*.json; Marathi falls back to the Hindi
@@ -104,13 +102,13 @@ function formatPlural(lang: Lang, template: string, count: number): string {
     cases.set(match[1], match[2]);
   }
   const exact = cases.get(`=${count}`);
-  const category = new Intl.PluralRules(lang === 'mr' ? 'mr' : lang === 'hi' ? 'hi' : 'en').select(count);
+  const category = new Intl.PluralRules(lang === 'hi' ? 'hi' : 'en').select(count);
   const body = exact ?? cases.get(category) ?? cases.get('other') ?? '';
   return body.replace(/#/g, new Intl.NumberFormat(lang).format(count));
 }
 
 export const t = (lang: Lang, key: MsgKey, vars?: { count?: number }) => {
-  const raw = messages[lang]?.[key] ?? (lang === 'mr' ? messages.hi[key] : messages.en[key]) ?? messages.en[key];
+  const raw = messages[lang]?.[key] ?? (lang === 'hi' ? messages.hi[key] : messages.en[key]) ?? messages.en[key];
   let text: string = typeof raw === 'string' ? raw : key;
   if (vars && typeof vars.count === 'number' && PLURAL.test(text)) {
     const count = vars.count;

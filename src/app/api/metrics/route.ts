@@ -4,7 +4,7 @@ export const runtime = 'nodejs';
 
 // Market Pulse separates DISCOVERY (what people looked at and saved) from
 // ACHIEVED OUTCOMES (connections accepted, tracker stages advanced). Discovery
-// numbers are intent, not results — the UI must never present them as outcomes.
+// numbers are intent, not results - the UI must never present them as outcomes.
 export async function GET(request: Request) {
   return handle(request, async () => {
     await workspace();

@@ -51,7 +51,7 @@ export function SignUpForm() {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Account created</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          This is your account recovery code. It is shown <strong>only once</strong> — store it somewhere safe.
+          This is your account recovery code. It is shown <strong>only once</strong> - store it somewhere safe.
           It is the only way to recover access if you forget your password.
         </p>
         <p className="mt-4 select-all rounded-xl bg-slate-900 px-4 py-3 text-center font-mono text-lg tracking-widest text-white">
@@ -68,7 +68,7 @@ export function SignUpForm() {
   return (
     <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <h1 className="text-2xl font-bold tracking-tight text-slate-900">Create your account</h1>
-      <p className="mt-1 text-sm text-slate-600">Pick the role that fits you best — your dashboard adapts to it.</p>
+      <p className="mt-1 text-sm text-slate-600">Pick the role that fits you best - your dashboard adapts to it.</p>
 
       <fieldset className="mt-5">
         <legend className="text-sm font-semibold text-slate-900">I am a…</legend>

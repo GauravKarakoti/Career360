@@ -7,17 +7,27 @@ import {
   Radar, Users,
 } from 'lucide-react';
 import { useWorkspace } from '@/components/workspace-context';
-import { LANGS } from '@/lib/client-api';
+import { LANGS, type MsgKey } from '@/lib/client-api';
 
-const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dna', label: 'Opportunity DNA', icon: Dna },
-  { href: '/discover', label: 'Discover', icon: Radar },
-  { href: '/connections', label: 'Connections', icon: MessagesSquare },
-  { href: '/trackers', label: 'Trackers', icon: Users },
-  { href: '/organizations', label: 'Organizations', icon: Building2 },
-  { href: '/pulse', label: 'Market Pulse', icon: Radar },
+const NAV: { href: string; labelKey: MsgKey; icon: typeof LayoutDashboard }[] = [
+  { href: '/dashboard', labelKey: 'shell.nav.dashboard', icon: LayoutDashboard },
+  { href: '/dna', labelKey: 'shell.nav.dna', icon: Dna },
+  { href: '/discover', labelKey: 'discover.title', icon: Radar },
+  { href: '/connections', labelKey: 'connections.title', icon: MessagesSquare },
+  { href: '/trackers', labelKey: 'trackers.title', icon: Users },
+  { href: '/organizations', labelKey: 'orgs.title', icon: Building2 },
+  { href: '/pulse', labelKey: 'pulse.title', icon: Radar },
 ];
+
+const ROLE_LABEL_KEYS: Record<string, MsgKey> = {
+  Candidate: 'dashboard.role.Candidate.label',
+  Startup: 'dashboard.role.Startup.label',
+  Recruiter: 'dashboard.role.Recruiter.label',
+  Creator: 'dashboard.role.Creator.label',
+  Business: 'dashboard.role.Business.label',
+  'Event organiser': 'dashboard.role.EventOrganiser.label',
+  'Sponsor / Brand': 'dashboard.role.SponsorBrand.label',
+};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -34,10 +44,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const nextLang = LANGS[(LANGS.findIndex((l) => l.id === lang) + 1) % LANGS.length];
+  const translatedRole = primaryRole
+    ? (ROLE_LABEL_KEYS[primaryRole] ? t(ROLE_LABEL_KEYS[primaryRole]) : primaryRole)
+    : null;
+
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 sm:py-4">
+        <div className="mx-10 px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link href="/dashboard" className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-brand-600 text-white shadow-sm shadow-brand-600/30">
@@ -45,48 +60,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </span>
               <span>
                 <span className="block text-base font-bold tracking-tight text-heading">Career360</span>
-                <span className="block text-xs text-slate-500">From information to opportunity to action</span>
+                <span className="block text-xs text-slate-500">{t('shell.tagline')}</span>
               </span>
             </Link>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {email && (
                 <span className="flex items-center gap-2 text-xs text-slate-500">
                   <span className="max-w-[16rem] truncate">{email}</span>
-                  {primaryRole && (
+                  {translatedRole && (
                     <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
-                      {primaryRole}
+                      {translatedRole}
                     </span>
                   )}
                 </span>
               )}
-              <button type="button" onClick={() => setLang(lang === 'en' ? 'hi' : lang === 'hi' ? 'mr' : 'en')}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50" aria-label="Switch language">
-                {LANGS[(LANGS.findIndex(l => l.id === lang) + 1) % LANGS.length].label}
+              <button
+                type="button"
+                onClick={() => setLang(nextLang.id)}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+                aria-label={t('shell.switchLang')}
+              >
+                {nextLang.label}
               </button>
               {email ? (
-                <button type="button" onClick={signOut}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+                >
                   {t('shell.signOut')}
                 </button>
               ) : (
-                <Link href="/signin"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">
+                <Link
+                  href="/signin"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+                >
                   {t('shell.signIn')}
                 </Link>
               )}
             </div>
           </div>
           <nav aria-label="Main" className="mt-3 flex gap-1 overflow-x-auto pb-1">
-            {NAV.map(entry => {
+            {NAV.map((entry) => {
               const active = pathname === entry.href;
               return (
-                <Link key={entry.href} href={entry.href} aria-current={active ? 'page' : undefined}
+                <Link
+                  key={entry.href}
+                  href={entry.href}
+                  aria-current={active ? 'page' : undefined}
                   className={`inline-flex shrink-0 items-center gap-1.5 rounded-[10px] px-3 py-1.5 text-sm font-medium transition ${
                     active
                       ? 'bg-brand-600 text-white shadow-sm shadow-brand-600/25'
                       : 'text-slate-600 hover:bg-slate-100 hover:text-ink'
-                  }`}>
-                  <entry.icon aria-hidden className={`h-4 w-4 ${active ? '' : 'text-slate-400'}`} /> {entry.label}
+                  }`}
+                >
+                  <entry.icon aria-hidden className={`h-4 w-4 ${active ? '' : 'text-slate-400'}`} />{' '}
+                  {t(entry.labelKey)}
                 </Link>
               );
             })}
@@ -95,7 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {(error || notice) && (
-        <div className="mx-auto max-w-6xl px-4 pt-4 sm:px-6" role="status" aria-live="polite">
+        <div className="mx-10 px-4 pt-4 sm:px-6" role="status" aria-live="polite">
           {error ? (
             <p className="flex items-start gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-inset ring-red-200">
               <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> {error}
@@ -108,11 +137,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {children}
+      <div className="flex flex-1 flex-col pb-10">
+        {children}
+      </div>
 
-      <footer className="mt-10 border-t border-slate-200 bg-white py-6">
-        <p className="mx-auto max-w-6xl px-4 text-center text-xs text-slate-500 sm:px-6">
-          Demo listings are explicitly fictional and labelled. User submissions are unverified. Your workspace is private to your account.
+      <footer className="mt-auto border-t border-slate-200 bg-white py-6">
+        <p className="mx-10 px-4 text-center text-xs text-slate-500 sm:px-6">
+          {t('shell.footer')}
         </p>
       </footer>
     </div>

@@ -3,7 +3,7 @@
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Opportunity Workspace palette — ink #202B3B, heading #10213A, canvas #F5F7FA, accent #2455D6 */
+  /* Opportunity Workspace palette - ink #202B3B, heading #10213A, canvas #F5F7FA, accent #2455D6 */
   --color-canvas: #F5F7FA;
   --color-ink: #202B3B;
   --color-heading: #10213A;
