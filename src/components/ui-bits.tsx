@@ -184,7 +184,7 @@ export function OpportunityCard({
           </span>
         )}
       </div>
-      <p className="mt-3 text-sm leading-relaxed text-slate-700">{item.description}</p>
+      <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-slate-700">{item.description}</p>
       <div className="mt-3 space-y-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold text-emerald-700">{t('card.offers')}</span>

@@ -31,6 +31,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const acceptLang = request.headers.get('accept-language') || '';
+    const preferredLanguage: 'en' | 'hi' = acceptLang.includes('hi')
+      ? 'hi'
+      : 'en';
+
     const result = await syncOpportunitiesForDna(
       {
         role: profile.role,
@@ -43,6 +48,7 @@ export async function POST(request: Request) {
         interests: profile.interests ?? undefined,
         constraints: profile.constraints ?? undefined,
         goals: profile.goals ?? undefined,
+        preferredLanguage,
       },
       { force: parsedBody?.force ?? false }
     );

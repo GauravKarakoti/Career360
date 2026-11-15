@@ -12,6 +12,7 @@ export type DnaInput = {
   interests?: string;
   constraints?: string;
   goals?: string;
+  preferredLanguage?: 'en' | 'hi';
 };
 
 export type DiscoveredListing = {
@@ -41,7 +42,7 @@ type CacheEntry = {
   totalMatched: number;
 };
 
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes L1 memory cache per DNA signature
+const CACHE_TTL_MS = 15 * 60 * 1000;
 
 const globalForCache = globalThis as unknown as {
   __o360DnaSyncCache?: Map<string, CacheEntry>;
@@ -50,15 +51,23 @@ const dnaSyncCache =
   globalForCache.__o360DnaSyncCache ??
   (globalForCache.__o360DnaSyncCache = new Map<string, CacheEntry>());
 
-function stripHtml(raw: string): string {
+export function cleanHtmlText(raw: string): string {
+  if (!raw) return '';
   return raw
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<img[^>]*>/gi, ' ')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
+    .replace(/<\/?[a-z][^>]*>/gi, ' ')
+    .replace(/class="[^"]*"/gi, ' ')
+    .replace(/style="[^"]*"/gi, ' ')
+    .replace(/styles-module__[^\s]+/gi, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
     .replace(/&[a-z0-9#]+;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -71,7 +80,7 @@ function buildDnaSignature(dna: DnaInput): string {
     dna.location.toLowerCase().trim(),
     [...dna.capabilities].map((c) => c.toLowerCase().trim()).sort().join(','),
     [...dna.needs].map((n) => n.toLowerCase().trim()).sort().join(','),
-    (dna.interests ?? '').toLowerCase().trim(),
+    (dna.preferredLanguage ?? 'en').toLowerCase(),
   ].join('|');
 }
 
@@ -125,37 +134,30 @@ async function fetchRemotiveOpportunities(
       if (!job.title || !job.company_name || !job.url || !job.url.startsWith('https://')) {
         continue;
       }
-      const cleanDesc = stripHtml(job.description ?? '').slice(0, 1200);
+      const cleanDesc = cleanHtmlText(job.description ?? '').slice(0, 1500);
       if (cleanDesc.length < 40) continue;
 
-      const tags = (job.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 8);
-      const matchedCapOverlap = dna.capabilities.filter((cap) =>
-        cleanDesc.toLowerCase().includes(cap.toLowerCase())
-      );
-      const requirements = Array.from(new Set([...matchedCapOverlap, ...tags])).slice(0, 8);
-
-      const offers = Array.from(
-        new Set([
-          ...dna.needs.slice(0, 2),
-          job.salary ? `Compensation: ${job.salary}` : 'Remote role',
-          job.job_type ? job.job_type.replace('_', ' ') : 'Full-time opportunity',
-        ])
-      ).slice(0, 6);
+      const tags = (job.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 6);
+      const offers = [
+        job.salary ? `Compensation: ${job.salary}` : 'Competitive remote salary',
+        job.job_type ? job.job_type.replace('_', ' ') : 'Full-time position',
+        'Global team culture',
+      ];
 
       results.push({
         title: job.title.slice(0, 160),
         organization: job.company_name.slice(0, 160),
         category: 'Jobs & internships',
         location: (job.candidate_required_location || 'Remote').slice(0, 160),
-        industry: (dna.industry || job.category || 'Technology').slice(0, 160),
-        description: cleanDesc.slice(0, 1800),
-        requirements: requirements.length ? requirements : ['Software engineering'],
-        preferred: tags.slice(4, 8),
+        industry: (job.category || dna.industry || 'Technology').slice(0, 160),
+        description: cleanDesc,
+        requirements: tags.length > 0 ? tags : dna.capabilities.slice(0, 4),
+        preferred: [],
         offers,
         sourceUrl: job.url,
         evidence: [
           { field: 'title', quote: job.title.slice(0, 140) },
-          { field: 'description', quote: cleanDesc.slice(0, 220) },
+          { field: 'description', quote: cleanDesc.slice(0, 200) },
         ],
         deadline: null,
       });
@@ -168,7 +170,7 @@ async function fetchRemotiveOpportunities(
 }
 
 async function fetchUnstopOpportunities(
-  keywords: string[],
+  _keywords: string[],
   dna: DnaInput
 ): Promise<DiscoveredListing[]> {
   try {
@@ -227,11 +229,11 @@ async function fetchUnstopOpportunities(
         .filter(Boolean)
         .slice(0, 6);
 
-      const details = stripHtml(String(row.details ?? row.short_desc ?? title));
+      const details = cleanHtmlText(String(row.details ?? row.short_desc ?? title));
       const description =
         details.length >= 30
           ? details.slice(0, 1500)
-          : `${title} hosted by ${orgName}. Open opportunity matching ${keywords.slice(0, 2).join(', ')}.`;
+          : `${title} hosted by ${orgName}.`;
 
       const endDateStr = String(row.end_date ?? '');
       const parsedDeadline = endDateStr ? new Date(endDateStr) : null;
@@ -246,13 +248,9 @@ async function fetchUnstopOpportunities(
         requirements:
           extractedTags.length > 0
             ? extractedTags
-            : dna.capabilities.slice(0, 3).length > 0
-              ? dna.capabilities.slice(0, 3)
-              : ['Problem solving', 'Domain collaboration'],
+            : dna.capabilities.slice(0, 4),
         preferred: [],
-        offers: Array.from(
-          new Set([...dna.needs.slice(0, 2), 'Recognition & prizes', 'Networking'])
-        ),
+        offers: ['Recognition & prizes', 'Networking opportunities', 'Verified participation'],
         sourceUrl: fullUrl,
         evidence: [
           { field: 'title', quote: title.slice(0, 140) },
@@ -305,13 +303,10 @@ async function fetchArbeitnowOpportunities(
 
     for (const item of selected) {
       if (!item.title || !item.company_name || !item.url?.startsWith('https://')) continue;
-      const cleanDesc = stripHtml(item.description ?? '').slice(0, 1200);
+      const cleanDesc = cleanHtmlText(item.description ?? '').slice(0, 1500);
       if (cleanDesc.length < 40) continue;
 
       const tags = (item.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 6);
-      const matchedCaps = dna.capabilities.filter((cap) =>
-        cleanDesc.toLowerCase().includes(cap.toLowerCase())
-      );
 
       results.push({
         title: item.title.slice(0, 160),
@@ -322,19 +317,17 @@ async function fetchArbeitnowOpportunities(
           : (item.location || 'Remote').slice(0, 160),
         industry: (dna.industry || tags[0] || 'Technology').slice(0, 160),
         description: cleanDesc,
-        requirements: Array.from(new Set([...matchedCaps, ...tags])).slice(0, 8),
+        requirements: tags.length > 0 ? tags : dna.capabilities.slice(0, 4),
         preferred: [],
-        offers: Array.from(
-          new Set([
-            ...dna.needs.slice(0, 2),
-            item.remote ? 'Remote flexibility' : 'Full-time role',
-            'Career growth',
-          ])
-        ),
+        offers: [
+          item.remote ? 'Remote flexibility' : 'On-site / Hybrid setup',
+          'Professional growth',
+          'Competitive compensation',
+        ],
         sourceUrl: item.url,
         evidence: [
           { field: 'title', quote: item.title.slice(0, 140) },
-          { field: 'description', quote: cleanDesc.slice(0, 220) },
+          { field: 'description', quote: cleanDesc.slice(0, 200) },
         ],
         deadline: null,
       });
@@ -346,18 +339,21 @@ async function fetchArbeitnowOpportunities(
   }
 }
 
-async function refineWithAiIfAvailable(
+async function refineAndTranslateListings(
   listings: DiscoveredListing[],
   dna: DnaInput
 ): Promise<DiscoveredListing[]> {
-  if (!aiAvailable() || listings.length === 0) return listings;
+  if (listings.length === 0) return listings;
+  const targetLang = dna.preferredLanguage ?? 'en';
+  if (!aiAvailable()) return listings;
 
   try {
     const batch = listings.slice(0, 6).map((item, idx) => ({
       idx,
       title: item.title,
       organization: item.organization,
-      excerpt: item.description.slice(0, 350),
+      rawDesc: item.description.slice(0, 800),
+      category: item.category,
     }));
 
     const schema = schemaOf(
@@ -367,6 +363,8 @@ async function refineWithAiIfAvailable(
           items: schemaOf(
             {
               idx: { type: 'number' },
+              title: { type: 'string' },
+              description: { type: 'string' },
               category: {
                 type: 'string',
                 enum: [
@@ -381,16 +379,23 @@ async function refineWithAiIfAvailable(
               requirements: { type: 'array', items: { type: 'string' } },
               offers: { type: 'array', items: { type: 'string' } },
             },
-            ['idx', 'category', 'requirements', 'offers']
+            ['idx', 'title', 'description', 'category', 'requirements', 'offers']
           ),
         },
       },
       ['items']
     );
 
+    const languageInstruction =
+      targetLang === 'hi'
+        ? 'Translate the cleaned description, title, requirements, and offers into clear, professional Hindi.'
+        : 'Ensure text is clean, professional English.';
+
     const refined = await chatJson<{
       items: Array<{
         idx: number;
+        title: string;
+        description: string;
         category: DiscoveredListing['category'];
         requirements: string[];
         offers: string[];
@@ -399,12 +404,16 @@ async function refineWithAiIfAvailable(
       [
         {
           role: 'system',
-          content:
-            'For each real opportunity excerpt, extract 2-5 concise skill/requirement noun phrases (requirements) and 2-4 concrete benefits/offers (offers) grounded in the excerpt. Where accurate, align terminology with the user DNA terms so overlap scoring is clear.',
+          content: [
+            'You clean and refine raw scraped job/opportunity listings.',
+            'Remove all HTML artefacts, CSS snippets, and formatting noise.',
+            languageInstruction,
+            'Extract accurate, role-specific requirements and genuine offers. NEVER assign generic mismatched tags like "Hackathons" to regular jobs.',
+          ].join(' '),
         },
         {
           role: 'user',
-          content: `User DNA capabilities: ${dna.capabilities.join(', ')}\nUser DNA needs: ${dna.needs.join(', ')}\n\nListings:\n${JSON.stringify(batch)}`,
+          content: `Target Language Code: ${targetLang}\nUser DNA Role: ${dna.role}\n\nListings to clean & refine:\n${JSON.stringify(batch)}`,
         },
       ],
       'dna_web_refinement',
@@ -414,18 +423,14 @@ async function refineWithAiIfAvailable(
     for (const entry of refined.items ?? []) {
       const target = listings[entry.idx];
       if (!target) continue;
-      if (entry.requirements?.length) {
-        target.requirements = entry.requirements.slice(0, 8);
-      }
-      if (entry.offers?.length) {
-        target.offers = entry.offers.slice(0, 6);
-      }
-      if (entry.category) {
-        target.category = entry.category;
-      }
+      if (entry.title) target.title = entry.title.slice(0, 160);
+      if (entry.description) target.description = entry.description.slice(0, 2000);
+      if (entry.category) target.category = entry.category;
+      if (entry.requirements?.length) target.requirements = entry.requirements.slice(0, 8);
+      if (entry.offers?.length) target.offers = entry.offers.slice(0, 6);
     }
   } catch {
-    // Keep deterministic tags on timeout
+    // Keep base listings on timeout
   }
 
   return listings;
@@ -475,7 +480,7 @@ export async function syncOpportunitiesForDna(
     }
   }
 
-  const discovered = await refineWithAiIfAvailable(Array.from(byUrl.values()), dna);
+  const discovered = await refineAndTranslateListings(Array.from(byUrl.values()), dna);
 
   let created = 0;
   let reused = 0;
@@ -517,7 +522,7 @@ export async function syncOpportunitiesForDna(
       });
       created += 1;
     } catch {
-      // Skip duplicate or constraint conflict
+      // Skip duplicate
     }
   }
 

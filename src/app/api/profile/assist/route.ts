@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 const assistInput = z.object({
   text: z.string().trim().min(20).max(2000),
-  language: z.enum(['en', 'hi', 'mr']).default('en'),
+  language: z.enum(['en', 'hi']).default('en'),
 });
 
 const stringOrJoinedArray = (maxLen: number) =>
@@ -42,7 +42,6 @@ const draftSchema = z.object({
 const languageGuides = {
   en: 'Reply in simple English.',
   hi: 'शुद्ध हिंदी में उत्तर दें ("role" को छोड़कर अन्य सभी स्ट्रिंग फ़ील्ड हिंदी में लिखें)।',
-  mr: 'स्पष्ट मराठीत उत्तर द्या ("role" वगळता इतर सर्व स्ट्रिंग फील्ड मराठीत लिहा).',
 } as const;
 
 export async function POST(request: Request) {
