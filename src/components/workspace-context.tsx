@@ -41,6 +41,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLang] = useState<Lang>('en');
   const langRef = useRef<Lang>('en');
   langRef.current = lang;
+  // Translations are generated lazily; while some are pending we poll a few times.
+  const retryTimer = useRef<number | undefined>(undefined);
+  const scheduleRetryRef = useRef<((query: string | undefined, attempt: number) => void) | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState<ProfileForm>(EMPTY_FORM);
   const [hasProfile, setHasProfile] = useState(false);
@@ -52,7 +55,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const load = useCallback(async () => {
     try {
       const ws = await api<{ profile: Profile | null; saved: { opportunityId: string }[]; email: string | null; primaryRole: string | null }>('/api/workspace');
-      const feed = await api<{ opportunities: Opportunity[] }>(`/api/opportunities?lang=${langRef.current}`);
+      const feed = await api<{ opportunities: Opportunity[]; pending?: number }>(`/api/opportunities?lang=${langRef.current}`);
       if (ws.profile) {
         const p = ws.profile;
         setProfileForm({
@@ -68,6 +71,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setPrimaryRole(ws.primaryRole);
       setSavedIds(new Set(ws.saved.map(entry => entry.opportunityId)));
       setOpportunities(feed.opportunities);
+      if (feed.pending) scheduleRetryRef.current?.(undefined, 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not load your workspace.');
     } finally {
@@ -121,16 +125,29 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [savedIds]);
 
-  const refreshOpportunities = useCallback(async (query?: string) => {
+  const fetchFeed = useCallback(async (query: string | undefined, attempt: number) => {
+    window.clearTimeout(retryTimer.current);
     try {
       const params = new URLSearchParams({ lang: langRef.current });
       if (query) params.set('q', query);
-      const feed = await api<{ opportunities: Opportunity[] }>(`/api/opportunities?${params}`);
+      const feed = await api<{ opportunities: Opportunity[]; pending?: number }>(`/api/opportunities?${params}`);
       setOpportunities(feed.opportunities);
+      if (feed.pending && attempt < 4) scheduleRetryRef.current?.(query, attempt + 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Search failed.');
     }
   }, []);
+
+  scheduleRetryRef.current = (query, attempt) => {
+    window.clearTimeout(retryTimer.current);
+    retryTimer.current = window.setTimeout(() => { void fetchFeed(query, attempt); }, 8000);
+  };
+
+  const refreshOpportunities = useCallback(async (query?: string) => {
+    await fetchFeed(query, 0);
+  }, [fetchFeed]);
+
+  useEffect(() => () => window.clearTimeout(retryTimer.current), []);
 
   // Re-fetch listings in the newly chosen language (translations are cached server-side).
   const firstLang = useRef(true);

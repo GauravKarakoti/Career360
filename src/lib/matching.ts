@@ -195,11 +195,17 @@ export function match(profile: DNA | null, listing: Listing) {
   const industry = industriesAlign(profile.industry, listing.industry);
   const location = locationsAlign(profile.location, listing.location);
 
-  const score = Math.round(
+  // A listing that names no skill requirements (e.g. an open-to-all event) is scored on the
+  // remaining components, rescaled to 100, instead of being capped by an empty skills term.
+  const hasRequirements = listing.requirements.length > 0;
+  const raw =
     (needs.length ? forYou.length / needs.length : 0) * needsWeight +
-      (listing.requirements.length ? forThem.length / listing.requirements.length : 0) * skillsWeight +
-      Number(industry) * industryWeight +
-      Number(location) * locationWeight
+    (hasRequirements ? forThem.length / listing.requirements.length : 0) * skillsWeight +
+    Number(industry) * industryWeight +
+    Number(location) * locationWeight;
+  const score = Math.min(
+    100,
+    Math.round(hasRequirements ? raw : (raw / (100 - skillsWeight)) * 100)
   );
 
   return {

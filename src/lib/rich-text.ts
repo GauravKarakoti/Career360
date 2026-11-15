@@ -22,6 +22,11 @@ export function decodeEntities(input: string): string {
 const stripTags = (s: string) => s.replace(/<[^>]+>/g, '');
 const inline = (s: string) => stripTags(s).replace(/\s+/g, ' ').trim();
 
+/** True when the text still contains HTML tags or HTML entities. */
+export function looksLikeMarkup(text: string): boolean {
+  return /<\/?[a-z][^>]*>?/i.test(text) || /&(lt|gt|amp|nbsp|quot|#\d+|#x[0-9a-f]+);/i.test(text);
+}
+
 export function htmlToMarkdown(raw: string): string {
   if (!raw) return '';
   let s = raw.replace(/\r\n?/g, '\n');
@@ -41,10 +46,20 @@ export function htmlToMarkdown(raw: string): string {
     .replace(/<img[^>]*>/gi, ' ')
     .replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_, __, t: string) => {
       const text = inline(t);
-      return text ? `**${text}**` : '';
+      if (!text) return ' ';
+      // Keep the whitespace that sat inside the tag, but outside the ** markers.
+      const lead = /^\s/.test(stripTags(t)) ? ' ' : '';
+      const trail = /\s$/.test(stripTags(t)) ? ' ' : '';
+      return `${lead}**${text}**${trail}`;
     })
-    .replace(/<h[1-2]\b[^>]*>([\s\S]*?)<\/h[1-2]>/gi, (_, t: string) => `\n\n## ${inline(t)}\n\n`)
-    .replace(/<h[3-6]\b[^>]*>([\s\S]*?)<\/h[3-6]>/gi, (_, t: string) => `\n\n### ${inline(t)}\n\n`)
+    .replace(/<h[1-2]\b[^>]*>([\s\S]*?)<\/h[1-2]>/gi, (_, t: string) => {
+      const text = inline(t);
+      return text ? `\n\n## ${text}\n\n` : '\n\n';
+    })
+    .replace(/<h[3-6]\b[^>]*>([\s\S]*?)<\/h[3-6]>/gi, (_, t: string) => {
+      const text = inline(t);
+      return text ? `\n\n### ${text}\n\n` : '\n\n';
+    })
     .replace(/<li\b[^>]*>([\s\S]*?)<\/li>/gi, (_, t: string) => {
       const text = t.replace(/<\/?(p|div|br)\b[^>]*>/gi, ' ');
       const flat = inline(text);
@@ -55,6 +70,10 @@ export function htmlToMarkdown(raw: string): string {
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|section|article|header|footer|tr|table|blockquote)>/gi, '\n\n')
     .replace(/<(p|div|section|article|header|footer|tr|table|blockquote)\b[^>]*>/gi, '\n\n');
+
+  // A description cut off mid-tag (e.g. `<li style="font-size: 10pt;"><span sty`) would
+  // otherwise leak raw markup, so drop any unterminated trailing tag first.
+  s = s.replace(/<[^>]*$/, '');
 
   // Remove whatever tags are left, then decode entities (decoding last means
   // "&lt;script&gt;" in the text can never turn back into a tag).

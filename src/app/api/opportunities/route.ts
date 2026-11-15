@@ -6,6 +6,8 @@ import { ApiError, handle, jsonBody, signedInAccount, workspace } from '@/lib/se
 import { opportunityInput } from '@/lib/validation';
 import { syncOpportunitiesForDna } from '@/lib/web-discovery';
 import { localizeListings, parseLang } from '@/lib/translate';
+import { cleanRequirements, isUnstopUrl } from '@/lib/listing-terms';
+import { htmlToMarkdown, looksLikeMarkup, truncateMarkdown } from '@/lib/rich-text';
 
 const ROLE_ALLOWED_CATEGORIES: Record<string, readonly string[]> = {
   Candidate: ['Collaborations', 'Learning'],
@@ -83,6 +85,24 @@ export async function GET(request: Request) {
       ).catch(() => {});
     }
 
+    // Self-heal rows stored by older versions: raw/truncated HTML descriptions and
+    // non-skill "requirements" (Remote, Undergraduate, All ...).
+    const repairs: Promise<unknown>[] = [];
+    for (const row of listings) {
+      if (looksLikeMarkup(row.description)) {
+        row.description = truncateMarkdown(htmlToMarkdown(row.description), 3500);
+        if (row.ownerId === null) {
+          repairs.push(
+            db().opportunity.update({ where: { id: row.id }, data: { description: row.description } })
+          );
+        }
+      }
+      if (row.ownerId === null) {
+        row.requirements = cleanRequirements(row.requirements, { unstop: isUnstopUrl(row.sourceUrl) });
+      }
+    }
+    void Promise.allSettled(repairs);
+
     const now = new Date();
     const scored = listings.map((item) => ({
       ...item,
@@ -103,9 +123,9 @@ export async function GET(request: Request) {
     }
 
     // Matching/ranking runs on the canonical text above; translation is display-only.
-    const opportunities = await localizeListings(scored, lang);
+    const { items: opportunities, pending } = await localizeListings(scored, lang);
 
-    return { opportunities, query: q || null, lang };
+    return { opportunities, query: q || null, lang, pending };
   });
 }
 

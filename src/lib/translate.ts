@@ -14,9 +14,9 @@ type Translatable = {
   offers: string[];
 };
 
-const CHUNK = 4; // listings per LLM call
+const CHUNK = 2; // listings per LLM call (Devanagari output is token-heavy)
 const MAX_PER_REQUEST = 12; // cap work done inside one page load
-const WAIT_MS = 15_000; // how long a page load waits before showing the original text
+const WAIT_MS = 25_000; // how long a page load waits before showing the original text
 
 const hashOf = (item: Translatable) =>
   createHash('sha1').update(`${item.title}\n${item.description}`).digest('hex').slice(0, 16);
@@ -106,8 +106,11 @@ async function translateChunk(chunk: Translatable[], lang: SupportedLang) {
  * Cached translations are applied immediately; missing ones are generated (bounded
  * per request) and saved for every later reader. Falls back to the original text.
  */
-export async function localizeListings<T extends Translatable>(items: T[], lang: SupportedLang): Promise<T[]> {
-  if (lang === 'en' || items.length === 0) return items;
+export async function localizeListings<T extends Translatable>(
+  items: T[],
+  lang: SupportedLang
+): Promise<{ items: T[]; pending: number }> {
+  if (lang === 'en' || items.length === 0) return { items, pending: 0 };
 
   const cached = await db().opportunityTranslation.findMany({
     where: { lang, opportunityId: { in: items.map((i) => i.id) } },
@@ -122,6 +125,9 @@ export async function localizeListings<T extends Translatable>(items: T[], lang:
     else missing.push(item);
   }
 
+  if (missing.length && !aiAvailable()) {
+    console.error('translate: GROQ_API_KEY is not set, showing original text');
+  }
   if (missing.length && aiAvailable()) {
     const todo = missing.slice(0, MAX_PER_REQUEST);
     const jobs: Promise<void>[] = [];
@@ -131,17 +137,20 @@ export async function localizeListings<T extends Translatable>(items: T[], lang:
           .then((rows) => {
             for (const row of rows) fresh.set(row.opportunityId, row as (typeof cached)[number]);
           })
-          .catch((error) => console.error('translate chunk failed', error))
+          .catch((error) => console.error('translate chunk failed:', error instanceof Error ? error.message : error))
       );
     }
     // Wait a bounded time. Slow chunks keep running and still save to the cache.
     await Promise.race([Promise.all(jobs), new Promise((resolve) => setTimeout(resolve, WAIT_MS))]);
   }
 
-  return items.map((item) => {
+  const out = items.map((item) => {
     const row = fresh.get(item.id);
     return row
       ? { ...item, title: row.title, description: row.description, requirements: row.requirements, offers: row.offers }
       : item;
   });
+  // Only report pending when AI is available; otherwise retrying would be pointless.
+  const pending = aiAvailable() ? items.filter((item) => !fresh.has(item.id)).length : 0;
+  return { items: out, pending };
 }

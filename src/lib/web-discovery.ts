@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { aiAvailable, chatJson, schemaOf } from '@/lib/ai';
+import { cleanRequirements } from '@/lib/listing-terms';
 import { htmlToMarkdown, markdownToPlain, truncateMarkdown } from '@/lib/rich-text';
 
 export type DnaInput = {
@@ -127,7 +128,7 @@ async function fetchRemotiveOpportunities(
       const { markdown: cleanDesc, plain: plainDesc } = toDescription(job.description ?? '');
       if (plainDesc.length < 40) continue;
 
-      const tags = (job.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 6);
+      const tags = cleanRequirements((job.tags ?? []).map((t) => t.trim()).filter(Boolean)).slice(0, 6);
       const offers = [
         job.salary ? `Compensation: ${job.salary}` : 'Competitive remote salary',
         job.job_type ? job.job_type.replace('_', ' ') : 'Full-time position',
@@ -141,7 +142,7 @@ async function fetchRemotiveOpportunities(
         location: (job.candidate_required_location || 'Remote').slice(0, 160),
         industry: (job.category || dna.industry || 'Technology').slice(0, 160),
         description: cleanDesc,
-        requirements: tags.length > 0 ? tags : dna.capabilities.slice(0, 4),
+        requirements: tags,
         preferred: [],
         offers,
         sourceUrl: job.url,
@@ -214,14 +215,19 @@ async function fetchUnstopOpportunities(
             : 'Events';
 
       const filters = Array.isArray(row.filters) ? row.filters : [];
-      const extractedTags = filters
+      // Unstop "filters" describe who may apply (Undergraduate, Management, All ...), not skills.
+      const eligibility = filters
         .map((f: Record<string, unknown>) => String(f.name ?? '').trim())
         .filter(Boolean)
-        .slice(0, 6);
+        .slice(0, 8);
 
       const details = toDescription(String(row.details ?? row.short_desc ?? title));
-      const description =
+      const baseDescription =
         details.plain.length >= 30 ? details.markdown : `${title} hosted by ${orgName}.`;
+      const description =
+        eligibility.length > 0
+          ? `${baseDescription}\n\n**Open to:** ${eligibility.join(', ')}`
+          : baseDescription;
 
       const endDateStr = String(row.end_date ?? '');
       const parsedDeadline = endDateStr ? new Date(endDateStr) : null;
@@ -233,10 +239,7 @@ async function fetchUnstopOpportunities(
         location: String(row.region ?? 'Online / Hybrid').slice(0, 160),
         industry: dna.industry || 'Technology',
         description,
-        requirements:
-          extractedTags.length > 0
-            ? extractedTags
-            : dna.capabilities.slice(0, 4),
+        requirements: [],
         preferred: [],
         offers: ['Recognition & prizes', 'Networking opportunities', 'Verified participation'],
         sourceUrl: fullUrl,
@@ -294,7 +297,7 @@ async function fetchArbeitnowOpportunities(
       const { markdown: cleanDesc, plain: plainDesc } = toDescription(item.description ?? '');
       if (plainDesc.length < 40) continue;
 
-      const tags = (item.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 6);
+      const tags = cleanRequirements((item.tags ?? []).map((t) => t.trim()).filter(Boolean)).slice(0, 6);
 
       results.push({
         title: item.title.slice(0, 160),
@@ -305,7 +308,7 @@ async function fetchArbeitnowOpportunities(
           : (item.location || 'Remote').slice(0, 160),
         industry: (dna.industry || tags[0] || 'Technology').slice(0, 160),
         description: cleanDesc,
-        requirements: tags.length > 0 ? tags : dna.capabilities.slice(0, 4),
+        requirements: tags,
         preferred: [],
         offers: [
           item.remote ? 'Remote flexibility' : 'On-site / Hybrid setup',
@@ -402,7 +405,8 @@ async function refineListings(
               'If the description is NOT English, put a faithful English translation in descriptionEnglish with exactly the same structure.',
               'If it is already English, return an empty string for descriptionEnglish. Never summarise or shorten.',
               'Translate title, requirements and offers to English if they are not; keep company and technology names as-is.',
-              'Extract accurate, role-specific requirements and genuine offers. NEVER assign generic mismatched tags like "Hackathons" to regular jobs.',
+              'requirements must be concrete skills, tools or qualifications the description actually asks for (e.g. "React", "SQL", "3+ years in finance"). NEVER include work mode (Remote, Online, Hybrid), employment type, location, or who may apply (Undergraduate, Students, All). Return an empty array if the text names no real requirement; do not invent any.',
+              'offers must be genuine benefits stated in the text. NEVER assign generic mismatched tags like "Hackathons" to regular jobs.',
             ].join(' '),
           },
           {
@@ -422,7 +426,8 @@ async function refineListings(
           target.description = truncateMarkdown(entry.descriptionEnglish.trim(), MAX_DESCRIPTION);
         }
         if (entry.category) target.category = entry.category;
-        if (entry.requirements?.length) target.requirements = entry.requirements.slice(0, 8);
+        const refinedReqs = cleanRequirements(entry.requirements ?? []);
+        if (refinedReqs.length) target.requirements = refinedReqs.slice(0, 8);
         if (entry.offers?.length) target.offers = entry.offers.slice(0, 6);
       }
     } catch {
