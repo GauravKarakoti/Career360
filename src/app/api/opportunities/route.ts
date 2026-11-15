@@ -123,9 +123,9 @@ export async function GET(request: Request) {
     }
 
     // Matching/ranking runs on the canonical text above; translation is display-only.
-    const { items: opportunities, pending } = await localizeListings(scored, lang);
+    const { items: opportunities, pending, translation } = await localizeListings(scored, lang);
 
-    return { opportunities, query: q || null, lang, pending };
+    return { opportunities, query: q || null, lang, pending, translation };
   });
 }
 

@@ -14,8 +14,8 @@ type Translatable = {
   offers: string[];
 };
 
-const CHUNK = 2; // listings per LLM call (Devanagari output is token-heavy)
-const MAX_PER_REQUEST = 12; // cap work done inside one page load
+const CONCURRENCY = 2; // parallel calls; more tends to trip provider tokens-per-minute limits
+const MAX_PER_REQUEST = 6; // top-ranked listings per page load; the client polls for the rest
 const WAIT_MS = 25_000; // how long a page load waits before showing the original text
 
 const hashOf = (item: Translatable) =>
@@ -25,6 +25,7 @@ export function parseLang(value: string | null | undefined): SupportedLang {
   return value === 'hi' ? 'hi' : 'en';
 }
 
+// One listing per call, so a single failure or rate limit never loses a whole batch.
 async function translateChunk(chunk: Translatable[], lang: SupportedLang) {
   const schema = schemaOf(
     {
@@ -74,7 +75,8 @@ async function translateChunk(chunk: Translatable[], lang: SupportedLang) {
       },
     ],
     'opportunity_translation',
-    schema
+    schema,
+    { model: process.env.GROQ_TRANSLATE_MODEL || undefined, lowReasoning: true }
   );
 
   const rows = [];
@@ -92,11 +94,16 @@ async function translateChunk(chunk: Translatable[], lang: SupportedLang) {
     });
   }
   if (rows.length) {
-    // Replace any stale row, then insert.
-    await db().opportunityTranslation.deleteMany({
-      where: { lang, opportunityId: { in: rows.map((r) => r.opportunityId) } },
-    });
-    await db().opportunityTranslation.createMany({ data: rows, skipDuplicates: true });
+    try {
+      // Replace any stale row, then insert.
+      await db().opportunityTranslation.deleteMany({
+        where: { lang, opportunityId: { in: rows.map((r) => r.opportunityId) } },
+      });
+      await db().opportunityTranslation.createMany({ data: rows, skipDuplicates: true });
+    } catch (error) {
+      // Still show this translation now even if it could not be cached.
+      console.error('translate: could not save to OpportunityTranslation (run prisma migrate + generate?):', error);
+    }
   }
   return rows;
 }
@@ -106,42 +113,69 @@ async function translateChunk(chunk: Translatable[], lang: SupportedLang) {
  * Cached translations are applied immediately; missing ones are generated (bounded
  * per request) and saved for every later reader. Falls back to the original text.
  */
+export type TranslationStatus = { status: 'ok' | 'unavailable' | 'error'; reason?: string };
+
+/**
+ * Returns the listings with title/description/requirements/offers in `lang`.
+ * Cached translations are applied immediately; missing ones are generated (bounded
+ * per request) and saved for every later reader. Falls back to the original text and
+ * reports why, so the UI can say so instead of silently showing the wrong language.
+ */
 export async function localizeListings<T extends Translatable>(
   items: T[],
   lang: SupportedLang
-): Promise<{ items: T[]; pending: number }> {
-  if (lang === 'en' || items.length === 0) return { items, pending: 0 };
+): Promise<{ items: T[]; pending: number; translation: TranslationStatus }> {
+  if (lang === 'en' || items.length === 0) return { items, pending: 0, translation: { status: 'ok' } };
 
-  const cached = await db().opportunityTranslation.findMany({
-    where: { lang, opportunityId: { in: items.map((i) => i.id) } },
-  });
-  const byId = new Map(cached.map((row) => [row.opportunityId, row]));
-
-  const fresh = new Map<string, (typeof cached)[number]>();
+  type Row = {
+    opportunityId: string; title: string; description: string;
+    requirements: string[]; offers: string[]; sourceHash: string;
+  };
+  const fresh = new Map<string, Row>();
   const missing: T[] = [];
-  for (const item of items) {
-    const row = byId.get(item.id);
-    if (row && row.sourceHash === hashOf(item)) fresh.set(item.id, row);
-    else missing.push(item);
+  let cacheError: string | null = null;
+
+  try {
+    const cached = await db().opportunityTranslation.findMany({
+      where: { lang, opportunityId: { in: items.map((i) => i.id) } },
+    });
+    const byId = new Map(cached.map((row) => [row.opportunityId, row]));
+    for (const item of items) {
+      const row = byId.get(item.id);
+      if (row && row.sourceHash === hashOf(item)) fresh.set(item.id, row);
+      else missing.push(item);
+    }
+  } catch (error) {
+    console.error('translate: cache read failed (run prisma migrate + generate?):', error);
+    cacheError = 'Translation cache is unavailable. Run the database migration and `prisma generate`.';
+    missing.push(...items);
   }
 
-  if (missing.length && !aiAvailable()) {
-    console.error('translate: GROQ_API_KEY is not set, showing original text');
-  }
+  const errors: string[] = [];
   if (missing.length && aiAvailable()) {
-    const todo = missing.slice(0, MAX_PER_REQUEST);
-    const jobs: Promise<void>[] = [];
-    for (let i = 0; i < todo.length; i += CHUNK) {
-      jobs.push(
-        translateChunk(todo.slice(i, i + CHUNK), lang)
-          .then((rows) => {
-            for (const row of rows) fresh.set(row.opportunityId, row as (typeof cached)[number]);
-          })
-          .catch((error) => console.error('translate chunk failed:', error instanceof Error ? error.message : error))
-      );
-    }
-    // Wait a bounded time. Slow chunks keep running and still save to the cache.
-    await Promise.race([Promise.all(jobs), new Promise((resolve) => setTimeout(resolve, WAIT_MS))]);
+    const queue = missing.slice(0, MAX_PER_REQUEST);
+    let stop = false;
+    const worker = async () => {
+      while (!stop) {
+        const item = queue.shift();
+        if (!item) return;
+        try {
+          const rows = await translateChunk([item], lang);
+          for (const row of rows) fresh.set(row.opportunityId, row);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error('translate failed:', message);
+          errors.push(message);
+          // Rate limited or provider down: stop hammering it, the client will poll again.
+          if (/rate limited|HTTP 4|HTTP 5/.test(message)) stop = true;
+        }
+      }
+    };
+    // Wait a bounded time. Slow calls keep running and still save to the cache.
+    await Promise.race([
+      Promise.all(Array.from({ length: CONCURRENCY }, worker)),
+      new Promise((resolve) => setTimeout(resolve, WAIT_MS)),
+    ]);
   }
 
   const out = items.map((item) => {
@@ -150,7 +184,14 @@ export async function localizeListings<T extends Translatable>(
       ? { ...item, title: row.title, description: row.description, requirements: row.requirements, offers: row.offers }
       : item;
   });
-  // Only report pending when AI is available; otherwise retrying would be pointless.
-  const pending = aiAvailable() ? items.filter((item) => !fresh.has(item.id)).length : 0;
-  return { items: out, pending };
+  const pending = items.filter((item) => !fresh.has(item.id)).length;
+
+  let translation: TranslationStatus = { status: 'ok' };
+  if (pending > 0 && !aiAvailable()) {
+    console.error('translate: GROQ_API_KEY is not set, showing original text');
+    translation = { status: 'unavailable', reason: 'Translation is not configured on this server (GROQ_API_KEY is missing).' };
+  } else if (pending > 0 && (errors.length || cacheError)) {
+    translation = { status: 'error', reason: errors[0] ?? cacheError ?? undefined };
+  }
+  return { items: out, pending: translation.status === 'unavailable' ? 0 : pending, translation };
 }

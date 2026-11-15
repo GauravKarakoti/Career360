@@ -10,7 +10,7 @@ const baseUrl = (
 // openai/gpt-oss-20b and openai/gpt-oss-120b natively support strict json_schema on Groq.
 const model =
   process.env.GROQ_MODEL ||
-  'openai/gpt-oss-20b';
+  'openai/gpt-oss-120b';
 
 const embedModel =
   process.env.GROQ_EMBED_MODEL ||
@@ -33,9 +33,11 @@ type ChatMessage = { role: 'system' | 'user'; content: string };
 export async function chatJson<T>(
   messages: ChatMessage[],
   schemaName: string,
-  schema: Record<string, unknown>
+  schema: Record<string, unknown>,
+  opts?: { model?: string; lowReasoning?: boolean }
 ): Promise<T> {
   assertAvailable();
+  const useModel = opts?.model || model;
 
   const requestChat = (useStrictSchema: boolean) => {
     const formattedMessages = useStrictSchema
@@ -55,9 +57,11 @@ export async function chatJson<T>(
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model,
+        model: useModel,
         messages: formattedMessages,
         temperature: 0.1,
+        // gpt-oss models spend tokens on hidden reasoning; keep it short for mechanical tasks.
+        ...(opts?.lowReasoning && useModel.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
         response_format: useStrictSchema
           ? { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } }
           : { type: 'json_object' }
@@ -77,7 +81,10 @@ export async function chatJson<T>(
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
     console.error('Groq chat error', response.status, detail.slice(0, 300));
-    throw new ApiError('The AI provider did not respond. Try again in a moment.', 502);
+    if (response.status === 429) {
+      throw new ApiError('The AI provider is rate limited right now. Try again shortly.', 429);
+    }
+    throw new ApiError(`The AI provider did not respond (HTTP ${response.status}). Try again in a moment.`, 502);
   }
 
   let payload: { choices: { message: { content: string } }[] };

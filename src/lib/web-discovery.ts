@@ -365,9 +365,10 @@ async function refineListings(
               ],
             },
             requirements: { type: 'array', items: { type: 'string' } },
+            eligibility: { type: 'array', items: { type: 'string' } },
             offers: { type: 'array', items: { type: 'string' } },
           },
-          ['idx', 'title', 'descriptionEnglish', 'category', 'requirements', 'offers']
+          ['idx', 'title', 'descriptionEnglish', 'category', 'requirements', 'eligibility', 'offers']
         ),
       },
     },
@@ -393,6 +394,7 @@ async function refineListings(
           descriptionEnglish: string;
           category: DiscoveredListing['category'];
           requirements: string[];
+          eligibility: string[];
           offers: string[];
         }>;
       }>(
@@ -405,6 +407,7 @@ async function refineListings(
               'If the description is NOT English, put a faithful English translation in descriptionEnglish with exactly the same structure.',
               'If it is already English, return an empty string for descriptionEnglish. Never summarise or shorten.',
               'Translate title, requirements and offers to English if they are not; keep company and technology names as-is.',
+              'eligibility is for conditions about the applicant that are not skills: student status or year, degree stream, age, residency, equipment such as a stable internet connection, availability, or general interest (e.g. "Final-year engineering student", "Stable internet connection", "Interest in cybersecurity"). Put those in eligibility, NOT in requirements.',
               'requirements must be concrete skills, tools or qualifications the description actually asks for (e.g. "React", "SQL", "3+ years in finance"). NEVER include work mode (Remote, Online, Hybrid), employment type, location, or who may apply (Undergraduate, Students, All). Return an empty array if the text names no real requirement; do not invent any.',
               'offers must be genuine benefits stated in the text. NEVER assign generic mismatched tags like "Hackathons" to regular jobs.',
             ].join(' '),
@@ -424,6 +427,13 @@ async function refineListings(
         if (entry.title?.trim()) target.title = entry.title.trim().slice(0, 160);
         if (entry.descriptionEnglish?.trim()) {
           target.description = truncateMarkdown(entry.descriptionEnglish.trim(), MAX_DESCRIPTION);
+        }
+        const eligibility = (entry.eligibility ?? []).map((e) => e.trim()).filter(Boolean).slice(0, 6);
+        if (eligibility.length && !target.description.includes('**Eligibility:**')) {
+          target.description = truncateMarkdown(
+            `${target.description}\n\n**Eligibility:** ${eligibility.join('; ')}`,
+            MAX_DESCRIPTION + 400
+          );
         }
         if (entry.category) target.category = entry.category;
         const refinedReqs = cleanRequirements(entry.requirements ?? []);

@@ -130,9 +130,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     try {
       const params = new URLSearchParams({ lang: langRef.current });
       if (query) params.set('q', query);
-      const feed = await api<{ opportunities: Opportunity[]; pending?: number }>(`/api/opportunities?${params}`);
+      const feed = await api<{
+        opportunities: Opportunity[];
+        pending?: number;
+        translation?: { status: 'ok' | 'unavailable' | 'error'; reason?: string };
+      }>(`/api/opportunities?${params}`);
       setOpportunities(feed.opportunities);
-      if (feed.pending && attempt < 4) scheduleRetryRef.current?.(query, attempt + 1);
+      const tr = feed.translation;
+      if (tr?.status === 'unavailable') {
+        setError(tr.reason || 'Translation is not available right now.');
+      } else if (feed.pending && attempt < 4) {
+        scheduleRetryRef.current?.(query, attempt + 1);
+      } else if (feed.pending && tr?.status === 'error') {
+        setError(`Some listings could not be translated: ${tr.reason || 'unknown error'}`);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Search failed.');
     }

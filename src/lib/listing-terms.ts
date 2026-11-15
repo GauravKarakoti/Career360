@@ -19,12 +19,19 @@ const AUDIENCE = new Set([
 // listing it can be a genuine skill, so it is excluded only for Unstop-sourced rows.
 const UNSTOP_STREAMS = /^(management|arts,? commerce,? sciences?( & others)?|others?)$/i;
 
+// Whole-sentence eligibility / logistics / attitude lines the AI or a board may emit as a
+// "requirement" ("Final-year engineering student", "Stable internet connection",
+// "Interest in cybersecurity"). They are conditions to check, not skills to learn.
+const ELIGIBILITY_PHRASE =
+  /\b(students?|undergrad\w*|postgrad\w*|pursuing|enrolled|final[- ]year|(?:first|second|third|fourth)[- ]year|freshers?|graduating|eligib\w+|stable internet|internet connection|laptop|own device|aged? \d+|years? old|resident of|citizens?|citizenship|willing to|available (?:for|to|in)|interest in|interested in|passion for|enthusias\w+)\b/i;
+
 const norm = (s: string) => s.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
 
 export function isSkillTerm(term: string, opts?: { unstop?: boolean }): boolean {
   const n = norm(term);
   if (n.length < 2) return false;
   if (WORK_MODE.has(n) || AUDIENCE.has(n)) return false;
+  if (ELIGIBILITY_PHRASE.test(n)) return false;
   if (opts?.unstop && UNSTOP_STREAMS.test(n)) return false;
   return true;
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cleanRequirements } from '@/lib/listing-terms';
 import { ApiError, handle, jsonBody, workspace, rateLimit, signedInAccount } from '@/lib/session';
 import { aiAvailable, chatJson, schemaOf } from '@/lib/ai';
 
@@ -382,7 +383,7 @@ export async function POST(request: Request) {
         location: extraction.location.slice(0, 160),
         industry: extraction.industry.slice(0, 160),
         description: extraction.description.slice(0, 2000),
-        requirements: extraction.requirements.slice(0, 20),
+        requirements: cleanRequirements(extraction.requirements).slice(0, 20),
         preferred: (extraction.preferred ?? []).slice(0, 20),
         offers: extraction.offers.slice(0, 20),
         sourceUrl: url,
