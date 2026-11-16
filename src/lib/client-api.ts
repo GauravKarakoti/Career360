@@ -68,6 +68,14 @@ export type Tracker = {
   id: string; opportunityId: string | null; kind: string; title: string; stage: string; notes: string;
   counterpart: string; updatedAt: string; opportunity: TrackedOpportunity | null;
 };
+export type Conversation = {
+  id: string;
+  counterpart: { name: string; roles: string[]; industry: string; location: string; private: boolean };
+  lastMessage: { body: string; mine: boolean; createdAt: string } | null;
+  unread: number;
+  lastActivityAt: string;
+};
+export type ChatMessage = { id: string; body: string; mine: boolean; createdAt: string; pending?: boolean };
 export type Metrics = {
   window: { days: number };
   discovery: { searches: number; views: number; saves: number; listingsPublished: number };

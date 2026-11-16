@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { MessagesSquare } from 'lucide-react';
+import Link from 'next/link';
+import { Handshake, MessageCircle } from 'lucide-react';
 import { api, type Connections, type MsgKey } from '@/lib/client-api';
 import { useWorkspace } from '@/components/workspace-context';
 
@@ -12,11 +13,8 @@ const STATUS_KEYS: Record<string, MsgKey> = {
 };
 
 export default function ConnectionsPage() {
-  const { flash, t } = useWorkspace();
+  const { flash, t, lang } = useWorkspace();
   const [connections, setConnections] = useState<Connections | null>(null);
-  const [openThread, setOpenThread] = useState<string | null>(null);
-  const [threadMessages, setThreadMessages] = useState<{ id: string; body: string; mine: boolean; createdAt: string }[]>([]);
-  const [draftMessage, setDraftMessage] = useState('');
   const [contactTo, setContactTo] = useState('');
   const [contactMessage, setContactMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -40,32 +38,6 @@ export default function ConnectionsPage() {
       flash(status === 'accepted' ? t('connections.flashAccepted') : t('connections.flashDeclined'));
     } catch (caught) {
       flash(caught instanceof Error ? caught.message : t('connections.respondError'));
-    }
-  };
-
-  const openChat = async (requestId: string) => {
-    if (openThread === requestId) {
-      setOpenThread(null);
-      return;
-    }
-    setOpenThread(requestId);
-    try {
-      const thread = await api<{ messages: typeof threadMessages }>(`/api/messages?requestId=${requestId}`);
-      setThreadMessages(thread.messages);
-    } catch (caught) {
-      flash(caught instanceof Error ? caught.message : t('connections.chatError'));
-    }
-  };
-
-  const sendMessage = async (requestId: string) => {
-    if (!draftMessage.trim()) return;
-    try {
-      await api('/api/messages', { method: 'POST', body: JSON.stringify({ requestId, body: draftMessage.trim() }) });
-      setDraftMessage('');
-      const thread = await api<{ messages: typeof threadMessages }>(`/api/messages?requestId=${requestId}`);
-      setThreadMessages(thread.messages);
-    } catch (caught) {
-      flash(caught instanceof Error ? caught.message : t('connections.sendError'));
     }
   };
 
@@ -100,69 +72,31 @@ export default function ConnectionsPage() {
     return key ? t(key) : status;
   };
 
-  const renderChatSection = (requestId: string) => (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={() => openChat(requestId)}
-        aria-expanded={openThread === requestId}
-        className="rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
-      >
-        {openThread === requestId ? t('connections.hideChat') : t('connections.openChat')}
-      </button>
-      {openThread === requestId && (
-        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <ul className="space-y-1.5">
-            {threadMessages.length ? (
-              threadMessages.map((message) => (
-                <li
-                  key={message.id}
-                  className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs ${
-                    message.mine
-                      ? 'ml-auto bg-brand-600 text-white'
-                      : 'bg-white text-slate-800 ring-1 ring-inset ring-slate-200'
-                  }`}
-                >
-                  {message.body}
-                </li>
-              ))
-            ) : (
-              <li className="text-xs text-slate-500">{t('connections.noMessages')}</li>
-            )}
-          </ul>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void sendMessage(requestId);
-            }}
-            className="mt-2 flex gap-2"
-          >
-            <label className="sr-only" htmlFor={`msg-${requestId}`}>
-              {t('connections.messageLabel')}
-            </label>
-            <input
-              id={`msg-${requestId}`}
-              value={draftMessage}
-              onChange={(event) => setDraftMessage(event.target.value)}
-              placeholder={t('connections.messagePlaceholder')}
-              className="flex-1 border p-1 rounded-lg border-slate-500 text-xs"
-            />
-            <button
-              type="submit"
-              className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-800"
-            >
-              {t('connections.send')}
-            </button>
-          </form>
-        </div>
-      )}
-    </div>
+  const renderMessageAction = (requestId: string) => (
+    <Link
+      href={`/messages?c=${encodeURIComponent(requestId)}`}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+    >
+      <MessageCircle aria-hidden className="h-3.5 w-3.5" />
+      {t('connections.message')}
+    </Link>
+  );
+
+  const renderDetails = (person: { roles: string[] }, createdAt: string) => (
+    <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+      {person.roles.map((role) => (
+        <span key={role} className="rounded-full bg-brand-50 px-2 py-0.5 font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
+          {role}
+        </span>
+      ))}
+      <time dateTime={createdAt}>{new Date(createdAt).toLocaleDateString(lang)}</time>
+    </p>
   );
 
   return (
     <main className="mx-10 flex-1 px-4 py-6 sm:px-6">
       <div className="flex items-center gap-2">
-        <MessagesSquare aria-hidden className="h-5 w-5 text-brand-600" />
+        <Handshake aria-hidden className="h-5 w-5 text-brand-600" />
         <h1 className="text-xl font-bold text-slate-900">{t('connections.title')}</h1>
       </div>
       <p className="mt-1 max-w-2xl text-sm text-slate-500">
@@ -215,6 +149,7 @@ export default function ConnectionsPage() {
               {connections.received.map((item) => (
                 <li key={item.id} className="rounded-lg border border-slate-200 p-3">
                   <p className="font-medium">{item.from.name}</p>
+                  {renderDetails(item.from, item.createdAt)}
                   {item.message && <p className="mt-0.5 text-xs text-slate-600">“{item.message}”</p>}
                   {item.status === 'pending' ? (
                     <div className="mt-2 flex gap-2">
@@ -234,7 +169,7 @@ export default function ConnectionsPage() {
                       </button>
                     </div>
                   ) : item.status === 'accepted' ? (
-                    renderChatSection(item.id)
+                    renderMessageAction(item.id)
                   ) : (
                     <p className="mt-1 text-xs capitalize text-slate-500">{renderStatus(item.status)}</p>
                   )}
@@ -253,9 +188,10 @@ export default function ConnectionsPage() {
               {connections.sent.map((item) => (
                 <li key={item.id} className="rounded-lg border border-slate-200 p-3">
                   <p className="font-medium">{item.to.name}</p>
+                  {renderDetails(item.to, item.createdAt)}
                   {item.message && <p className="mt-0.5 text-xs text-slate-600">“{item.message}”</p>}
                   {item.status === 'accepted' ? (
-                    renderChatSection(item.id)
+                    renderMessageAction(item.id)
                   ) : (
                     <p className="mt-0.5 text-xs capitalize text-slate-500">{renderStatus(item.status)}</p>
                   )}

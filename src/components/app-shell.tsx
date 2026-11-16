@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  AlertCircle, CheckCircle2, Building2, Dna, LayoutDashboard, Loader2, MessagesSquare,
+  AlertCircle, CheckCircle2, Building2, Dna, Handshake, LayoutDashboard, Loader2, MessageCircle,
   Radar, Users,
 } from 'lucide-react';
 import { useWorkspace } from '@/components/workspace-context';
@@ -13,7 +13,8 @@ const NAV: { href: string; labelKey: MsgKey; icon: typeof LayoutDashboard }[] = 
   { href: '/dashboard', labelKey: 'shell.nav.dashboard', icon: LayoutDashboard },
   { href: '/dna', labelKey: 'shell.nav.dna', icon: Dna },
   { href: '/discover', labelKey: 'discover.title', icon: Radar },
-  { href: '/connections', labelKey: 'connections.title', icon: MessagesSquare },
+  { href: '/connections', labelKey: 'connections.title', icon: Handshake },
+  { href: '/messages', labelKey: 'shell.nav.messages', icon: MessageCircle },
   { href: '/trackers', labelKey: 'trackers.title', icon: Users },
   { href: '/organizations', labelKey: 'orgs.title', icon: Building2 },
   { href: '/pulse', labelKey: 'pulse.title', icon: Radar },
@@ -33,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
     loading, error, notice, lang, setLang, t,
-    email, primaryRole, signOut,
+    email, primaryRole, signOut, unreadMessages,
   } = useWorkspace();
 
   if (loading) {
@@ -116,6 +117,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <entry.icon aria-hidden className={`h-4 w-4 ${active ? '' : 'text-slate-400'}`} />{' '}
                   {t(entry.labelKey)}
+                  {entry.href === '/messages' && unreadMessages > 0 && (
+                    <span
+                      aria-label={t('messages.unreadLabel', { count: unreadMessages })}
+                      className={`ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-5 ${
+                        active ? 'bg-white text-brand-700' : 'bg-brand-600 text-white'
+                      }`}
+                    >
+                      {unreadMessages > 99 ? '99+' : unreadMessages}
+                    </span>
+                  )}
                 </Link>
               );
             })}

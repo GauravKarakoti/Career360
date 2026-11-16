@@ -197,6 +197,10 @@ model ConnectionRequest {
   status          String    @default("pending")
   createdAt       DateTime  @default(now())
   respondedAt     DateTime?
+  // Read receipts: the time each participant last opened this conversation.
+  // Unread = messages from the other side newer than your own timestamp.
+  fromReadAt      DateTime?
+  toReadAt        DateTime?
   messages        Message[]
 
   @@index([toWorkspaceId, status])
