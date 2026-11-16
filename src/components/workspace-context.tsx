@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   api, splitTerms, EMPTY_FORM, t as tr,
-  type Lang, type MsgKey, type Opportunity, type Profile, type ProfileForm,
+  type Lang, type MsgKey, type Opportunity, type Profile, type ProfileForm, type Tracker,
 } from '@/lib/client-api';
 
 type WorkspaceContextValue = {
@@ -29,7 +29,13 @@ type WorkspaceContextValue = {
   refreshOpportunities: (query?: string) => Promise<void>;
   primaryRole: string | null;
   signOut: () => Promise<void>;
-  addTracker: (opportunity: Opportunity) => Promise<void>;
+  trackers: Tracker[] | null;
+  setTrackers: React.Dispatch<React.SetStateAction<Tracker[] | null>>;
+  refreshTrackers: () => Promise<void>;
+  trackedIds: Set<string>;
+  trackPendingIds: Set<string>;
+  toggleTrack: (opportunity: Opportunity) => Promise<void>;
+  untrack: (tracker: Tracker) => Promise<void>;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -51,11 +57,23 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [primaryRole, setPrimaryRole] = useState<string | null>(null);
+  // Single source of truth for tracking: the Discover cards and the Trackers page both read this.
+  const [trackers, setTrackers] = useState<Tracker[] | null>(null);
+  const trackersRef = useRef<Tracker[] | null>(null);
+  trackersRef.current = trackers;
+  const [trackPendingIds, setTrackPendingIds] = useState<Set<string>>(new Set());
+  // Synchronous guard so a double click can never fire two requests for the same opportunity.
+  const trackInFlight = useRef<Set<string>>(new Set());
+  const trackedIds = useMemo(
+    () => new Set((trackers ?? []).flatMap(row => (row.opportunityId ? [row.opportunityId] : []))),
+    [trackers],
+  );
 
   const load = useCallback(async () => {
     try {
       const ws = await api<{ profile: Profile | null; saved: { opportunityId: string }[]; email: string | null; primaryRole: string | null }>('/api/workspace');
       const feed = await api<{ opportunities: Opportunity[]; pending?: number }>(`/api/opportunities?lang=${langRef.current}`);
+      const tracked = await api<{ trackers: Tracker[] }>('/api/trackers');
       if (ws.profile) {
         const p = ws.profile;
         setProfileForm({
@@ -71,6 +89,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setPrimaryRole(ws.primaryRole);
       setSavedIds(new Set(ws.saved.map(entry => entry.opportunityId)));
       setOpportunities(feed.opportunities);
+      // Keep rows that are mid-request so an in-flight optimistic update is not clobbered.
+      setTrackers(tracked.trackers.filter(row => !(row.opportunityId && trackInFlight.current.has(row.opportunityId)))
+        .concat((trackersRef.current ?? []).filter(row => row.opportunityId && trackInFlight.current.has(row.opportunityId))));
       if (feed.pending) scheduleRetryRef.current?.(undefined, 1);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not load your workspace.');
@@ -176,17 +197,105 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const addTracker = useCallback(async (opportunity: Opportunity) => {
+  const refreshTrackers = useCallback(async () => {
+    try {
+      const data = await api<{ trackers: Tracker[] }>('/api/trackers');
+      const inFlight = trackInFlight.current;
+      setTrackers(previous => [
+        ...(previous ?? []).filter(row => row.opportunityId && inFlight.has(row.opportunityId)),
+        ...data.trackers.filter(row => !(row.opportunityId && inFlight.has(row.opportunityId))),
+      ]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not load your trackers.');
+    }
+  }, []);
+
+  const setPending = useCallback((id: string, pending: boolean) => {
+    if (pending) trackInFlight.current.add(id); else trackInFlight.current.delete(id);
+    setTrackPendingIds(new Set(trackInFlight.current));
+  }, []);
+
+  const toggleTrack = useCallback(async (opportunity: Opportunity) => {
+    const id = opportunity.id;
+    if (trackInFlight.current.has(id)) return;
+    const current = trackersRef.current ?? [];
+    const existing = current.find(row => row.opportunityId === id);
+    setPending(id, true);
+    try {
+      if (existing) {
+        // Untrack: remove optimistically, restore on failure. Only the tracker row is deleted.
+        const index = current.indexOf(existing);
+        setTrackers(previous => (previous ?? []).filter(row => row.opportunityId !== id));
+        try {
+          await api('/api/trackers', { method: 'DELETE', body: JSON.stringify({ opportunityId: id }) });
+          flash(`Stopped tracking “${opportunity.title}”.`);
+        } catch (caught) {
+          setTrackers(previous => {
+            const rows = (previous ?? []).filter(row => row.opportunityId !== id);
+            rows.splice(Math.min(index, rows.length), 0, existing);
+            return rows;
+          });
+          setError(caught instanceof Error ? caught.message : 'Could not stop tracking.');
+        }
+      } else {
+        const optimistic: Tracker = {
+          id: `pending-${id}`,
+          opportunityId: id,
+          kind: 'application',
+          title: opportunity.title,
+          stage: 'identified',
+          notes: '',
+          counterpart: opportunity.organization,
+          updatedAt: new Date().toISOString(),
+          opportunity: {
+            id, title: opportunity.title, organization: opportunity.organization, category: opportunity.category,
+            location: opportunity.location, description: opportunity.description, sourceUrl: opportunity.sourceUrl,
+            deadline: opportunity.deadline, isDemo: opportunity.isDemo,
+          },
+        };
+        setTrackers(previous => [optimistic, ...(previous ?? []).filter(row => row.opportunityId !== id)]);
+        try {
+          const result = await api<{ tracker: Tracker }>('/api/trackers', {
+            method: 'POST',
+            body: JSON.stringify({ opportunityId: id, kind: 'application', title: opportunity.title, counterpart: opportunity.organization }),
+          });
+          setTrackers(previous => (previous ?? []).map(row => (row.opportunityId === id ? result.tracker : row)));
+          flash(`Tracking “${opportunity.title}”.`);
+        } catch (caught) {
+          setTrackers(previous => (previous ?? []).filter(row => row.opportunityId !== id));
+          setError(caught instanceof Error ? caught.message : 'Could not start tracking.');
+        }
+      }
+    } finally {
+      setPending(id, false);
+    }
+  }, [flash, setPending]);
+
+  // Untrack from the Trackers page (also works for rows that have no linked opportunity).
+  const untrack = useCallback(async (tracker: Tracker) => {
+    const key = tracker.opportunityId ?? tracker.id;
+    if (trackInFlight.current.has(key)) return;
+    const current = trackersRef.current ?? [];
+    const index = current.indexOf(tracker);
+    setPending(key, true);
+    setTrackers(previous => (previous ?? []).filter(row => row.id !== tracker.id));
     try {
       await api('/api/trackers', {
-        method: 'POST',
-        body: JSON.stringify({ opportunityId: opportunity.id, kind: 'application', title: opportunity.title, counterpart: opportunity.organization })
+        method: 'DELETE',
+        body: JSON.stringify(tracker.opportunityId ? { opportunityId: tracker.opportunityId } : { id: tracker.id }),
       });
-      flash(`Tracking “${opportunity.title}”.`);
+      flash(`Stopped tracking “${tracker.title}”.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not start tracking.');
+      setTrackers(previous => {
+        const rows = (previous ?? []).filter(row => row.id !== tracker.id);
+        rows.splice(Math.min(Math.max(index, 0), rows.length), 0, tracker);
+        return rows;
+      });
+      setError(caught instanceof Error ? caught.message : 'Could not stop tracking.');
+    } finally {
+      setPending(key, false);
     }
-  }, [flash]);
+  }, [flash, setPending]);
 
   const value = useMemo<WorkspaceContextValue>(() => ({
     loading, error, notice, setError, flash,
@@ -195,10 +304,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     savedIds, savedCount: savedIds.size, toggleSave,
     profileForm, setProfileForm, hasProfile, savingProfile, saveProfile,
     opportunities, load, refreshOpportunities,
-    signOut, addTracker,
+    trackers, setTrackers, refreshTrackers, trackedIds, trackPendingIds, toggleTrack, untrack,
+    signOut,
   }), [loading, error, notice, flash, lang, email, primaryRole, savedIds, toggleSave, profileForm,
     hasProfile, savingProfile, saveProfile, opportunities, load, refreshOpportunities,
-    signOut, addTracker]);
+    trackers, refreshTrackers, trackedIds, trackPendingIds, toggleTrack, untrack, signOut]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

@@ -67,7 +67,7 @@ const ROLE_POLICY_COPY: Record<
       `“${title}” was identified as a “${category}” opportunity. As a ${role}, you cannot extract or publish “${category}” listings (you can only post: ${allowed}).`,
     blockedPublishError: (category, role, allowed) =>
       `As a ${role}, you cannot publish in “${category}”. Allowed categories: ${allowed}.`,
-    webSyncTitle: 'DNA-Matched Web & Database Feed',
+    webSyncTitle: 'DNA-Matched Feed',
     webSyncSub: (totalCount, cached) =>
       `${totalCount} listings scored against your Opportunity DNA${cached ? ' · served from fast cache' : ''}.`,
     syncBtn: 'Refresh web matches',
@@ -97,7 +97,9 @@ export default function DiscoverPage() {
     savedIds,
     savedCount,
     toggleSave,
-    addTracker,
+    trackedIds,
+    trackPendingIds,
+    toggleTrack,
     hasProfile,
     primaryRole,
     profileForm,
@@ -678,7 +680,9 @@ export default function DiscoverPage() {
               item={item}
               saved={savedIds.has(item.id)}
               onToggleSave={toggleSave}
-              onTrack={addTracker}
+              tracked={trackedIds.has(item.id)}
+              trackPending={trackPendingIds.has(item.id)}
+              onToggleTrack={toggleTrack}
             />
           ))
         )}

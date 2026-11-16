@@ -229,6 +229,7 @@ model Tracker {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
+  @@unique([workspaceId, opportunityId])
   @@index([workspaceId, kind])
 }
 

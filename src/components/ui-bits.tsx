@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, ChevronDown, ExternalLink } from 'lucide-react';
 import type { MatchResult, Opportunity } from '@/lib/client-api';
 import { useWorkspace } from '@/components/workspace-context';
 import { RichDescription } from '@/components/rich-description';
@@ -140,12 +140,16 @@ export function OpportunityCard({
   item,
   saved,
   onToggleSave,
-  onTrack,
+  tracked,
+  trackPending,
+  onToggleTrack,
 }: {
   item: Opportunity;
   saved: boolean;
   onToggleSave: (id: string) => void;
-  onTrack: (item: Opportunity) => void;
+  tracked: boolean;
+  trackPending: boolean;
+  onToggleTrack: (item: Opportunity) => void;
 }) {
   const { t } = useWorkspace();
   const trustLabel = item.isDemo ? t('card.demoFictional') : `${t('card.unverified')} · ${item.trust}`;
@@ -225,10 +229,18 @@ export function OpportunityCard({
         </button>
         <button
           type="button"
-          onClick={() => onTrack(item)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+          onClick={() => onToggleTrack(item)}
+          disabled={trackPending}
+          aria-pressed={tracked}
+          aria-busy={trackPending}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition-all duration-200 disabled:cursor-wait disabled:opacity-70 ${
+            tracked
+              ? 'bg-brand-600 text-white ring-brand-600 shadow-sm shadow-brand-600/30 hover:bg-brand-700'
+              : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50'
+          }`}
         >
-          {t('card.track')}
+          {tracked && <Check aria-hidden className="h-4 w-4" />}
+          {tracked ? t('card.tracking') : t('card.track')}
         </button>
         {item.sourceUrl && (
           <a

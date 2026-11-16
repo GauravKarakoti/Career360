@@ -145,7 +145,7 @@ export default function ConnectionsPage() {
               value={draftMessage}
               onChange={(event) => setDraftMessage(event.target.value)}
               placeholder={t('connections.messagePlaceholder')}
-              className="flex-1 rounded-lg border-slate-300 text-xs"
+              className="flex-1 border p-1 rounded-lg border-slate-500 text-xs"
             />
             <button
               type="submit"

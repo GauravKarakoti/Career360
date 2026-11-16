@@ -60,7 +60,14 @@ export type Connections = {
   sent: { id: string; status: string; message: string; createdAt: string; to: { name: string; roles: string[] } }[];
   received: { id: string; status: string; message: string; createdAt: string; from: { name: string; roles: string[] } }[];
 };
-export type Tracker = { id: string; kind: string; title: string; stage: string; notes: string; counterpart: string; updatedAt: string };
+export type TrackedOpportunity = {
+  id: string; title: string; organization: string; category: string; location: string;
+  description: string; sourceUrl: string | null; deadline: string | null; isDemo: boolean;
+};
+export type Tracker = {
+  id: string; opportunityId: string | null; kind: string; title: string; stage: string; notes: string;
+  counterpart: string; updatedAt: string; opportunity: TrackedOpportunity | null;
+};
 export type Metrics = {
   window: { days: number };
   discovery: { searches: number; views: number; saves: number; listingsPublished: number };
