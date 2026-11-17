@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Handshake, MessageCircle } from 'lucide-react';
+import { Handshake, MessageCircle, UserRound } from 'lucide-react';
 import { api, type Connections, type MsgKey } from '@/lib/client-api';
 import { useWorkspace } from '@/components/workspace-context';
+import { Avatar } from '@/components/messaging';
 
 const STATUS_KEYS: Record<string, MsgKey> = {
   pending: 'connections.status.pending',
@@ -75,12 +76,37 @@ export default function ConnectionsPage() {
   const renderMessageAction = (requestId: string) => (
     <Link
       href={`/messages?c=${encodeURIComponent(requestId)}`}
-      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-700"
     >
       <MessageCircle aria-hidden className="h-3.5 w-3.5" />
       {t('connections.message')}
     </Link>
   );
+
+  // Name, avatar and the View Profile button all open the same Opportunity DNA page.
+  // Private counterparts have no workspaceId, so they render as plain, non-linked text.
+  const renderPerson = (person: { workspaceId: string | null; name: string }, requestId: string) => {
+    const href = person.workspaceId
+      ? `/profile/${encodeURIComponent(person.workspaceId)}?from=connections&c=${encodeURIComponent(requestId)}`
+      : null;
+    const isPrivate = !person.workspaceId;
+    const avatar = <Avatar id={person.workspaceId ?? requestId} name={person.name} isPrivate={isPrivate} size="lg" />;
+    return {
+      avatar: href ? (
+        <Link href={href} aria-label={t('profile.viewProfileOf', { name: person.name })} className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">{avatar}</Link>
+      ) : avatar,
+      name: href ? <Link href={href} className="hover:text-brand-700 hover:underline">{person.name}</Link> : person.name,
+      action: href ? (
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-200 hover:bg-brand-50"
+        >
+          <UserRound aria-hidden className="h-3.5 w-3.5" />
+          {t('profile.viewProfile')}
+        </Link>
+      ) : null,
+    };
+  };
 
   const renderDetails = (person: { roles: string[] }, createdAt: string) => (
     <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
@@ -146,13 +172,17 @@ export default function ConnectionsPage() {
           <h2 className="font-semibold text-slate-900">{t('connections.received')}</h2>
           {connections?.received.length ? (
             <ul className="mt-2 space-y-2">
-              {connections.received.map((item) => (
-                <li key={item.id} className="rounded-lg border border-slate-200 p-3">
-                  <p className="font-medium">{item.from.name}</p>
+              {connections.received.map((item) => {
+                const person = renderPerson(item.from, item.id);
+                return (
+                <li key={item.id} className="flex gap-3 rounded-lg border border-slate-200 p-3">
+                  {person.avatar}
+                  <div className="min-w-0 flex-1">
+                  <p className="font-medium">{person.name}</p>
                   {renderDetails(item.from, item.createdAt)}
                   {item.message && <p className="mt-0.5 text-xs text-slate-600">“{item.message}”</p>}
                   {item.status === 'pending' ? (
-                    <div className="mt-2 flex gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => respond(item.id, 'accepted')}
@@ -167,14 +197,22 @@ export default function ConnectionsPage() {
                       >
                         {t('connections.decline')}
                       </button>
+                      {person.action}
                     </div>
-                  ) : item.status === 'accepted' ? (
-                    renderMessageAction(item.id)
                   ) : (
-                    <p className="mt-1 text-xs capitalize text-slate-500">{renderStatus(item.status)}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {item.status === 'accepted' ? (
+                        renderMessageAction(item.id)
+                      ) : (
+                        <p className="text-xs capitalize text-slate-500">{renderStatus(item.status)}</p>
+                      )}
+                      {person.action}
+                    </div>
                   )}
+                  </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           ) : (
             <p className="mt-2 text-xs text-slate-500">{t('connections.noReceived')}</p>
@@ -185,18 +223,27 @@ export default function ConnectionsPage() {
           <h2 className="font-semibold text-slate-900">{t('connections.sent')}</h2>
           {connections?.sent.length ? (
             <ul className="mt-2 space-y-2">
-              {connections.sent.map((item) => (
-                <li key={item.id} className="rounded-lg border border-slate-200 p-3">
-                  <p className="font-medium">{item.to.name}</p>
+              {connections.sent.map((item) => {
+                const person = renderPerson(item.to, item.id);
+                return (
+                <li key={item.id} className="flex gap-3 rounded-lg border border-slate-200 p-3">
+                  {person.avatar}
+                  <div className="min-w-0 flex-1">
+                  <p className="font-medium">{person.name}</p>
                   {renderDetails(item.to, item.createdAt)}
                   {item.message && <p className="mt-0.5 text-xs text-slate-600">“{item.message}”</p>}
-                  {item.status === 'accepted' ? (
-                    renderMessageAction(item.id)
-                  ) : (
-                    <p className="mt-0.5 text-xs capitalize text-slate-500">{renderStatus(item.status)}</p>
-                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {item.status === 'accepted' ? (
+                      renderMessageAction(item.id)
+                    ) : (
+                      <p className="text-xs capitalize text-slate-500">{renderStatus(item.status)}</p>
+                    )}
+                    {person.action}
+                  </div>
+                  </div>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           ) : (
             <p className="mt-2 text-xs text-slate-500">{t('connections.noSent')}</p>

@@ -12,17 +12,17 @@ type ProfileRow = { name: string; roles: string[]; industry: string; location: s
 
 export type ConversationDto = {
   id: string;
-  counterpart: { name: string; roles: string[]; industry: string; location: string; private: boolean };
+  counterpart: { workspaceId: string | null; name: string; roles: string[]; industry: string; location: string; private: boolean };
   lastMessage: { body: string; mine: boolean; createdAt: Date } | null;
   unread: number;
   lastActivityAt: Date;
 };
 
 // Same privacy rule as the Connections page: only discoverable profiles show details.
-function maskProfile(profile: ProfileRow): ConversationDto['counterpart'] {
+function maskProfile(workspaceId: string, profile: ProfileRow): ConversationDto['counterpart'] {
   return profile?.visibility === 'discoverable'
-    ? { name: profile.name, roles: profile.roles, industry: profile.industry, location: profile.location, private: false }
-    : { name: 'Private profile', roles: [], industry: '', location: '', private: true };
+    ? { workspaceId, name: profile.name, roles: profile.roles, industry: profile.industry, location: profile.location, private: false }
+    : { workspaceId: null, name: 'Private profile', roles: [], industry: '', location: '', private: true };
 }
 
 export function participantWhere(me: string): Prisma.ConnectionRequestWhereInput {
@@ -32,7 +32,7 @@ export function participantWhere(me: string): Prisma.ConnectionRequestWhereInput
 export function toConversation(
   row: {
     id: string; fromWorkspaceId: string; createdAt: Date; respondedAt: Date | null;
-    fromWorkspace: { profile: ProfileRow }; toWorkspace: { profile: ProfileRow };
+    fromWorkspace: { id: string; profile: ProfileRow }; toWorkspace: { id: string; profile: ProfileRow };
     messages: { body: string; senderId: string; createdAt: Date }[];
   },
   me: string,
@@ -42,7 +42,7 @@ export function toConversation(
   const other = row.fromWorkspaceId === me ? row.toWorkspace : row.fromWorkspace;
   return {
     id: row.id,
-    counterpart: maskProfile(other.profile),
+    counterpart: maskProfile(other.id, other.profile),
     lastMessage: last && { body: last.body, mine: last.senderId === me, createdAt: last.createdAt },
     unread,
     lastActivityAt: last?.createdAt ?? row.respondedAt ?? row.createdAt

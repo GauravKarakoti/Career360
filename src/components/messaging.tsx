@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import Link from 'next/link';
-import { AlertCircle, ArrowLeft, MessageCircle, Search, SendHorizontal, User } from 'lucide-react';
+import { AlertCircle, ArrowLeft, MessageCircle, Search, SendHorizontal, User, UserRound } from 'lucide-react';
 import { useWorkspace } from '@/components/workspace-context';
 import type { ChatMessage, Conversation } from '@/lib/client-api';
 
@@ -43,8 +43,8 @@ const TONES = [
   'bg-rose-100 text-rose-700',
 ];
 
-function Avatar({ id, name, isPrivate, size = 'md' }: { id: string; name: string; isPrivate: boolean; size?: 'md' | 'lg' }) {
-  const dimensions = size === 'lg' ? 'h-10 w-10 text-sm' : 'h-11 w-11 text-sm';
+export function Avatar({ id, name, isPrivate, size = 'md' }: { id: string; name: string; isPrivate: boolean; size?: 'md' | 'lg' | 'xl' }) {
+  const dimensions = size === 'xl' ? 'h-20 w-20 text-2xl' : size === 'lg' ? 'h-10 w-10 text-sm' : 'h-11 w-11 text-sm';
   if (isPrivate) {
     return (
       <span aria-hidden className={`flex shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 ${dimensions}`}>
@@ -279,6 +279,10 @@ export function ChatWindow({
 
   const person = conversation?.counterpart;
   const details = person ? [person.industry, person.location].filter(Boolean).join(' · ') : '';
+  // Private counterparts have no workspaceId, so no profile link is offered for them.
+  const profileHref = person?.workspaceId && conversation
+    ? `/profile/${encodeURIComponent(person.workspaceId)}?from=messages&c=${encodeURIComponent(conversation.id)}`
+    : null;
 
   return (
     // Full-screen on mobile, a normal pane beside the list from md up.
@@ -294,9 +298,17 @@ export function ChatWindow({
         </button>
         {person && conversation ? (
           <>
-            <Avatar id={conversation.id} name={person.name} isPrivate={person.private} size="lg" />
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold text-slate-900">{person.name}</h2>
+            {profileHref ? (
+              <Link href={profileHref} aria-label={t('profile.viewProfileOf', { name: person.name })} className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                <Avatar id={conversation.id} name={person.name} isPrivate={person.private} size="lg" />
+              </Link>
+            ) : (
+              <Avatar id={conversation.id} name={person.name} isPrivate={person.private} size="lg" />
+            )}
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-sm font-semibold text-slate-900">
+                {profileHref ? <Link href={profileHref} className="hover:text-brand-700 hover:underline">{person.name}</Link> : person.name}
+              </h2>
               <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-500">
                 {person.private ? (
                   t('messages.privateNote')
@@ -310,6 +322,16 @@ export function ChatWindow({
                 )}
               </p>
             </div>
+            {profileHref && (
+              <Link
+                href={profileHref}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-200 hover:bg-brand-50"
+              >
+                <UserRound aria-hidden className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{t('profile.viewProfile')}</span>
+                <span className="sm:hidden">{t('profile.viewShort')}</span>
+              </Link>
+            )}
           </>
         ) : (
           <span aria-hidden className="flex animate-pulse items-center gap-3">

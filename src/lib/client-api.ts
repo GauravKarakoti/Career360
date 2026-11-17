@@ -57,8 +57,8 @@ export type Draft = {
   sourceUrl: string; evidence: { field: string; quote: string }[]; confidence: string;
 };
 export type Connections = {
-  sent: { id: string; status: string; message: string; createdAt: string; to: { name: string; roles: string[] } }[];
-  received: { id: string; status: string; message: string; createdAt: string; from: { name: string; roles: string[] } }[];
+  sent: { id: string; status: string; message: string; createdAt: string; to: { workspaceId: string | null; name: string; roles: string[] } }[];
+  received: { id: string; status: string; message: string; createdAt: string; from: { workspaceId: string | null; name: string; roles: string[] } }[];
 };
 export type TrackedOpportunity = {
   id: string; title: string; organization: string; category: string; location: string;
@@ -70,11 +70,12 @@ export type Tracker = {
 };
 export type Conversation = {
   id: string;
-  counterpart: { name: string; roles: string[]; industry: string; location: string; private: boolean };
+  counterpart: { workspaceId: string | null; name: string; roles: string[]; industry: string; location: string; private: boolean };
   lastMessage: { body: string; mine: boolean; createdAt: string } | null;
   unread: number;
   lastActivityAt: string;
 };
+export type { ProfileViewDto } from './profile-policy';
 export type ChatMessage = { id: string; body: string; mine: boolean; createdAt: string; pending?: boolean };
 export type Metrics = {
   window: { days: number };
@@ -122,14 +123,15 @@ function formatPlural(lang: Lang, template: string, count: number): string {
   return body.replace(/#/g, new Intl.NumberFormat(lang).format(count));
 }
 
-export const t = (lang: Lang, key: MsgKey, vars?: { count?: number }) => {
+export const t = (lang: Lang, key: MsgKey, vars?: { count?: number; name?: string }) => {
   const raw = messages[lang]?.[key] ?? (lang === 'hi' ? messages.hi[key] : messages.en[key]) ?? messages.en[key];
   let text: string = typeof raw === 'string' ? raw : key;
   if (vars && typeof vars.count === 'number' && PLURAL.test(text)) {
     const count = vars.count;
     text = text.replace(PLURAL, (_, tpl: string) => formatPlural(lang, tpl, count));
   }
-  return text.replace(/\{count\}/g, String(vars?.count ?? '{count}'));
+  text = text.replace(/\{count\}/g, String(vars?.count ?? '{count}'));
+  return vars?.name === undefined ? text : text.replace(/\{name\}/g, () => vars.name as string);
 };
 
 export const splitTerms = (value: string) =>

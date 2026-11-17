@@ -51,10 +51,11 @@ export async function GET(request: Request) {
       })
     ]);
 
-    const mask = (profile: { name: string; roles: string[]; visibility: string } | null) =>
+    // workspaceId is only released for discoverable profiles; it powers the View Profile link.
+    const mask = (workspaceId: string, profile: { name: string; roles: string[]; visibility: string } | null) =>
       profile?.visibility === 'discoverable'
-        ? { name: profile.name, roles: profile.roles }
-        : { name: 'Private profile', roles: [] };
+        ? { workspaceId, name: profile.name, roles: profile.roles }
+        : { workspaceId: null, name: 'Private profile', roles: [] };
 
     return {
       sent: sent.map((item) => ({
@@ -62,14 +63,14 @@ export async function GET(request: Request) {
         status: item.status,
         message: item.message,
         createdAt: item.createdAt,
-        to: mask(item.toWorkspace.profile)
+        to: mask(item.toWorkspace.id, item.toWorkspace.profile)
       })),
       received: received.map((item) => ({
         id: item.id,
         status: item.status,
         message: item.message,
         createdAt: item.createdAt,
-        from: mask(item.fromWorkspace.profile)
+        from: mask(item.fromWorkspace.id, item.fromWorkspace.profile)
       }))
     };
   });

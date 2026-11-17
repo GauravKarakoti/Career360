@@ -10,6 +10,7 @@
         "db:migrate": "prisma migrate dev",
         "db:migrate:prod": "node scripts/database.mjs migrate",
         "typecheck": "tsc --noEmit",
+        "test:privacy": "node --experimental-strip-types --no-warnings scripts/check-profile-privacy.mjs",
         "postinstall": "npm run db:gen"
     },
     "dependencies": {

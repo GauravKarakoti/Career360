@@ -32,7 +32,7 @@ type WorkspaceContextValue = {
 
   lang: Lang;
   setLang: (lang: Lang) => void;
-  t: (key: MsgKey, vars?: { count?: number }) => string;
+  t: (key: MsgKey, vars?: { count?: number; name?: string }) => string;
 
   email: string | null;
   primaryRole: string | null;
@@ -733,7 +733,7 @@ export function WorkspaceProvider({
   // --------------------------------------------------
 
   const translate = useCallback(
-    (key: MsgKey, vars?: { count?: number }) =>
+    (key: MsgKey, vars?: { count?: number; name?: string }) =>
       tr(lang, key, vars),
     [lang],
   );
