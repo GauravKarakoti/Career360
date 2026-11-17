@@ -1,16 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { api, type Metrics } from '@/lib/client-api';
 import { useWorkspace } from '@/components/workspace-context';
 
 export default function PulsePage() {
-  const { flash, t } = useWorkspace();
+  const { flash, savedCount, t } = useWorkspace();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadMetrics = useCallback(async () => {
+    setLoading(true);
     try {
       setMetrics(await api<Metrics>('/api/metrics?days=30'));
     } catch (caught) {
@@ -22,15 +23,29 @@ export default function PulsePage() {
 
   useEffect(() => {
     void loadMetrics();
-  }, [loadMetrics]);
+  }, [loadMetrics, savedCount]);
 
   return (
     <main className="mx-10 flex-1 px-4 py-6 sm:px-6">
-      <h1 className="text-xl font-bold text-slate-900">{t('pulse.title')}</h1>
-      <p className="mt-1 max-w-2xl text-sm text-slate-500">
-        {t('pulse.intro')}
-      </p>
-      {loading ? (
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">{t('pulse.title')}</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            {t('pulse.intro')}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadMetrics()}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 disabled:opacity-60"
+        >
+          <RefreshCw aria-hidden className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
+      </div>
+
+      {loading && !metrics ? (
         <p className="mt-6 flex items-center gap-2 text-sm text-slate-500">
           <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> {t('pulse.loading')}
         </p>

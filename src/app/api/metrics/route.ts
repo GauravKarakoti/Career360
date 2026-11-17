@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { handle, workspace } from '@/lib/session';
+
 export const runtime = 'nodejs';
 
 // Market Pulse separates DISCOVERY (what people looked at and saved) from
@@ -7,7 +8,7 @@ export const runtime = 'nodejs';
 // numbers are intent, not results - the UI must never present them as outcomes.
 export async function GET(request: Request) {
   return handle(request, async () => {
-    await workspace();
+    const session = await workspace();
     const url = new URL(request.url);
     const days = Math.min(Math.max(Number(url.searchParams.get('days')) || 30, 1), 365);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -15,64 +16,130 @@ export async function GET(request: Request) {
     const grouped = await db().activityEvent.groupBy({
       by: ['kind', 'detail'],
       where: { createdAt: { gte: since } },
-      _count: { _all: true }
+      _count: { _all: true },
     });
-    const count = (kind: string) => grouped.filter(row => row.kind === kind).reduce((sum, row) => sum + row._count._all, 0);
 
-    const [workspaceAgg, listingAgg, acceptedAgg, sourceAgg] = await Promise.all([
+    const count = (kind: string) =>
+      grouped
+        .filter((row) => row.kind === kind)
+        .reduce((sum, row) => sum + row._count._all, 0);
+
+    const [
+      workspaceAgg,
+      listingAgg,
+      savedAgg,
+      workspaceSavedAgg,
+      trackerAgg,
+      advancedTrackerAgg,
+      connectionReqAgg,
+      acceptedAgg,
+      messageAgg,
+      sourceAgg,
+      verifiedAgg,
+    ] = await Promise.all([
       db().workspace.aggregate({ _count: { _all: true } }),
-      db().opportunity.aggregate({ _count: { _all: true }, where: { publishedAt: { gte: since } } }),
-      db().connectionRequest.aggregate({ _count: { _all: true }, where: { status: 'accepted', respondedAt: { gte: since } } }),
+      db().opportunity.aggregate({
+        _count: { _all: true },
+        where: { publishedAt: { gte: since } },
+      }),
+      db().savedOpportunity.aggregate({
+        _count: { _all: true },
+      }),
+      db().savedOpportunity.aggregate({
+        _count: { _all: true },
+        where: { workspaceId: session.id },
+      }),
+      db().tracker.aggregate({
+        _count: { _all: true },
+        where: { updatedAt: { gte: since } },
+      }),
+      db().tracker.aggregate({
+        _count: { _all: true },
+        where: {
+          stage: { not: 'identified' },
+          updatedAt: { gte: since },
+        },
+      }),
+      db().connectionRequest.aggregate({
+        _count: { _all: true },
+      }),
+      db().connectionRequest.aggregate({
+        _count: { _all: true },
+        where: { status: 'accepted', respondedAt: { gte: since } },
+      }),
+      db().message.aggregate({
+        _count: { _all: true },
+        where: { createdAt: { gte: since } },
+      }),
       // SDG tracking: only listings with a citable source count, grouped by
       // category (an SDG proxy). Verified shares use lastVerifiedAt, so a
       // number is always bound to a source and a time window.
       db().opportunity.groupBy({
         by: ['category'],
         where: { publishedAt: { gte: since }, sourceUrl: { not: null } },
-        _count: { _all: true }
-      })
+        _count: { _all: true },
+      }),
+      db().opportunity.groupBy({
+        by: ['category'],
+        where: {
+          publishedAt: { gte: since },
+          sourceUrl: { not: null },
+          sourceStatus: 'verified',
+          lastVerifiedAt: { gte: since },
+        },
+        _count: { _all: true },
+      }),
     ]);
-    const verifiedAgg = await db().opportunity.groupBy({
-      by: ['category'],
-      where: {
-        publishedAt: { gte: since },
-        sourceUrl: { not: null },
-        sourceStatus: 'verified',
-        lastVerifiedAt: { gte: since }
-      },
-      _count: { _all: true }
-    });
 
     const sdg = sourceAgg
-      .map(row => {
-        const verified = verifiedAgg.find(v => v.category === row.category)?._count._all ?? 0;
+      .map((row) => {
+        const verified =
+          verifiedAgg.find((v) => v.category === row.category)?._count._all ?? 0;
         return {
           category: row.category,
           sourceBackedListings: row._count._all,
-          reverified: verified
+          reverified: verified,
         };
       })
       .sort((a, b) => b.sourceBackedListings - a.sourceBackedListings);
 
-    const searches = grouped.filter(row => row.kind === 'opportunity.viewed' && row.detail.startsWith('search:')).reduce((sum, row) => sum + row._count._all, 0);
+    const searches = grouped
+      .filter((row) => row.kind === 'opportunity.viewed' && row.detail.startsWith('search:'))
+      .reduce((sum, row) => sum + row._count._all, 0);
+
+    // Use live table counts so seeded records, current saved items, and tracker
+    // stage progressions are always reflected accurately.
+    const saves = Math.max(savedAgg._count._all, workspaceSavedAgg._count._all);
+    const trackersCreated = Math.max(trackerAgg._count._all, count('tracker.created'));
+    const stagesAdvanced = Math.max(
+      advancedTrackerAgg._count._all,
+      count('tracker.advanced')
+    );
+    const connectionsAccepted = acceptedAgg._count._all;
+    const connectionRequests = Math.max(
+      connectionReqAgg._count._all,
+      connectionsAccepted,
+      count('connection.requested')
+    );
+    const messagesSent = Math.max(messageAgg._count._all, count('message.sent'));
 
     return {
       window: { days, since },
       discovery: {
         searches,
         views: count('opportunity.viewed'),
-        saves: count('opportunity.saved'),
-        listingsPublished: listingAgg._count._all
+        saves,
+        listingsPublished: listingAgg._count._all,
       },
       outcomes: {
-        connectionRequests: count('connection.requested'),
-        connectionsAccepted: acceptedAgg._count._all,
-        trackersCreated: count('tracker.created'),
-        stagesAdvanced: count('tracker.advanced'),
-        messagesSent: count('message.sent')
+        connectionRequests,
+        connectionsAccepted,
+        trackersCreated,
+        stagesAdvanced,
+        messagesSent,
       },
       totals: { workspaces: workspaceAgg._count._all },
-      sdg
+      sdg,
     };
   });
 }

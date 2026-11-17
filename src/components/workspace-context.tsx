@@ -83,6 +83,7 @@ export function WorkspaceProvider({
   const langRef = useRef<Lang>('en');
   langRef.current = lang;
 
+  const activeQueryRef = useRef<string | undefined>(undefined);
   const retryTimer = useRef<number | undefined>(undefined);
 
   const scheduleRetryRef = useRef<
@@ -137,6 +138,12 @@ export function WorkspaceProvider({
 
   const load = useCallback(async () => {
     try {
+      const currentQuery = activeQueryRef.current;
+      const params = new URLSearchParams({ lang: langRef.current });
+      if (currentQuery) {
+        params.set('q', currentQuery);
+      }
+
       const ws = await api<{
         profile: Profile | null;
         saved: { opportunityId: string }[];
@@ -147,7 +154,7 @@ export function WorkspaceProvider({
       const feed = await api<{
         opportunities: Opportunity[];
         pending?: number;
-      }>(`/api/opportunities?lang=${langRef.current}`);
+      }>(`/api/opportunities?${params}`);
 
       const tracked = await api<{ trackers: Tracker[] }>('/api/trackers');
 
@@ -198,7 +205,7 @@ export function WorkspaceProvider({
       });
 
       if (feed.pending) {
-        scheduleRetryRef.current?.(undefined, 1);
+        scheduleRetryRef.current?.(activeQueryRef.current, 1);
       }
     } catch (caught) {
       setError(
@@ -370,13 +377,18 @@ export function WorkspaceProvider({
     async (query: string | undefined, attempt: number) => {
       window.clearTimeout(retryTimer.current);
 
+      const normalizedQuery = query?.trim() || undefined;
+      if (attempt === 0) {
+        activeQueryRef.current = normalizedQuery;
+      }
+
       try {
         const params = new URLSearchParams({
           lang: langRef.current,
         });
 
-        if (query) {
-          params.set('q', query);
+        if (normalizedQuery) {
+          params.set('q', normalizedQuery);
         }
 
         const feed = await api<{
@@ -388,6 +400,11 @@ export function WorkspaceProvider({
           };
         }>(`/api/opportunities?${params}`);
 
+        // Ignore stale background retry responses if the user has since changed their search query
+        if (attempt > 0 && activeQueryRef.current !== normalizedQuery) {
+          return;
+        }
+
         setOpportunities(feed.opportunities);
 
         const translation = feed.translation;
@@ -398,7 +415,7 @@ export function WorkspaceProvider({
               'Translation is not available right now.',
           );
         } else if (feed.pending && attempt < 4) {
-          scheduleRetryRef.current?.(query, attempt + 1);
+          scheduleRetryRef.current?.(activeQueryRef.current, attempt + 1);
         } else if (feed.pending && translation?.status === 'error') {
           setError(
             `Some listings could not be translated: ${
@@ -446,8 +463,8 @@ export function WorkspaceProvider({
       return;
     }
 
-    void refreshOpportunities();
-  }, [lang, refreshOpportunities]);
+    void fetchFeed(activeQueryRef.current, 0);
+  }, [lang, fetchFeed]);
 
   // --------------------------------------------------
   // Refresh trackers

@@ -114,6 +114,7 @@ export default function DiscoverPage() {
   const [savedOnly, setSavedOnly] = useState(false);
   const [webOnly, setWebOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
   const [showListingForm, setShowListingForm] = useState(false);
   const [listingForm, setListingForm] = useState<ListingForm>(EMPTY_LISTING);
   const [publishing, setPublishing] = useState(false);
@@ -124,6 +125,7 @@ export default function DiscoverPage() {
   const [syncingWeb, setSyncingWeb] = useState(false);
   const [servedFromCache, setServedFromCache] = useState(false);
   const autoSyncedRef = useRef(false);
+  const hadSubmittedSearchRef = useRef(false);
 
   const activeRole = primaryRole || profileForm.role || 'Candidate';
   const allowedCategories = useMemo(
@@ -169,7 +171,6 @@ export default function DiscoverPage() {
           );
         }
       } catch {
-        // Silent on background sync; flash only on manual trigger
         if (force) flash('Could not reach external opportunity feeds right now.');
       } finally {
         setSyncingWeb(false);
@@ -178,7 +179,6 @@ export default function DiscoverPage() {
     [hasProfile, refreshOpportunities, searchQuery, flash]
   );
 
-  // Automatically sync web opportunities once when user has DNA
   useEffect(() => {
     if (hasProfile && !autoSyncedRef.current) {
       autoSyncedRef.current = true;
@@ -191,21 +191,67 @@ export default function DiscoverPage() {
     [opportunities]
   );
 
+  const normalizedSearchTokens = useMemo(
+    () =>
+      searchQuery
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean),
+    [searchQuery]
+  );
+
   const visible = useMemo(
     () =>
       opportunities.filter((item) => {
         if (savedOnly && !savedIds.has(item.id)) return false;
         if (webOnly && (item.isDemo || !item.sourceUrl)) return false;
         if (category !== 'All' && item.category !== category) return false;
+
+        if (normalizedSearchTokens.length > 0) {
+          const haystack = [
+            item.title,
+            item.organization,
+            item.category,
+            item.industry,
+            item.location,
+            item.description,
+            ...item.offers,
+            ...item.requirements,
+            ...(item.preferred ?? []),
+          ]
+            .join(' ')
+            .toLowerCase();
+
+          if (!normalizedSearchTokens.every((token) => haystack.includes(token))) {
+            return false;
+          }
+        }
+
         return true;
       }),
-    [opportunities, savedOnly, webOnly, savedIds, category]
+    [opportunities, savedOnly, webOnly, savedIds, category, normalizedSearchTokens]
   );
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (!value.trim() && hadSubmittedSearchRef.current) {
+      hadSubmittedSearchRef.current = false;
+      void refreshOpportunities(undefined);
+    }
+  };
 
   const runSearch = async (event: React.FormEvent) => {
     event.preventDefault();
-    await refreshOpportunities(searchQuery.trim() || undefined);
-    flash(searchQuery.trim() ? `“${searchQuery.trim()}”` : t('discover.showingAll'));
+    const trimmed = searchQuery.trim();
+    hadSubmittedSearchRef.current = Boolean(trimmed);
+    setSearching(true);
+    try {
+      await refreshOpportunities(trimmed || undefined);
+      flash(trimmed ? `“${trimmed}”` : t('discover.showingAll'));
+    } finally {
+      setSearching(false);
+    }
   };
 
   const publish = async (event: React.FormEvent) => {
@@ -364,13 +410,15 @@ export default function DiscoverPage() {
             type="search"
             placeholder={t('discover.searchPlaceholder')}
             value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="w-44 rounded-lg border border-slate-300 p-1.5 text-sm sm:w-56"
+            onChange={(event) => handleSearchChange(event.target.value)}
+            className="w-44 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm sm:w-56"
           />
           <button
             type="submit"
-            className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800"
+            disabled={searching}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
           >
+            {searching && <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />}
             {t('discover.searchBtn')}
           </button>
         </form>

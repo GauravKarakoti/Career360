@@ -19,6 +19,91 @@ const ROLE_ALLOWED_CATEGORIES: Record<string, readonly string[]> = {
   'Sponsor / Brand': ['Funding', 'Partnerships', 'Collaborations', 'Events'],
 };
 
+function computeSearchRelevance(
+  query: string,
+  canonical: {
+    title: string;
+    organization: string;
+    category: string;
+    industry: string;
+    location: string;
+    description: string;
+    requirements: string[];
+    preferred: string[];
+    offers: string[];
+  },
+  localized: {
+    title: string;
+    organization: string;
+    category: string;
+    industry: string;
+    location: string;
+    description: string;
+    requirements: string[];
+    preferred?: string[];
+    offers: string[];
+  },
+  ftsRank: number
+): number {
+  const normQuery = query.toLowerCase().trim();
+  if (!normQuery) return 1;
+
+  const tokens = normQuery
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  const titlePool = `${canonical.title} ${localized.title}`.toLowerCase();
+  const orgPool = `${canonical.organization} ${localized.organization}`.toLowerCase();
+  const tagsPool = [
+    ...canonical.requirements,
+    ...canonical.offers,
+    ...canonical.preferred,
+    ...localized.requirements,
+    ...localized.offers,
+    ...(localized.preferred ?? []),
+  ]
+    .join(' ')
+    .toLowerCase();
+  const metaPool = [
+    canonical.category,
+    canonical.industry,
+    canonical.location,
+    localized.category,
+    localized.industry,
+    localized.location,
+  ]
+    .join(' ')
+    .toLowerCase();
+  const descPool = `${canonical.description} ${localized.description}`.toLowerCase();
+
+  const fullHaystack = `${titlePool} ${orgPool} ${tagsPool} ${metaPool} ${descPool}`;
+
+  // Every search token must appear somewhere in the listing (canonical or translated) or have a positive FTS rank
+  const allTokensMatch = tokens.every((token) => fullHaystack.includes(token));
+  if (!allTokensMatch && ftsRank <= 0) {
+    return 0;
+  }
+
+  let score = ftsRank * 25;
+
+  if (titlePool.includes(normQuery)) score += 50;
+  if (orgPool.includes(normQuery)) score += 40;
+  if (tagsPool.includes(normQuery)) score += 35;
+  if (metaPool.includes(normQuery)) score += 25;
+  if (descPool.includes(normQuery)) score += 10;
+
+  for (const token of tokens) {
+    if (titlePool.includes(token)) score += 20;
+    if (orgPool.includes(token)) score += 15;
+    if (tagsPool.includes(token)) score += 15;
+    if (metaPool.includes(token)) score += 10;
+    if (descPool.includes(token)) score += 4;
+  }
+
+  return Math.max(score, 1);
+}
+
 export async function GET(request: Request) {
   return handle(request, async () => {
     const session = await workspace();
@@ -31,8 +116,8 @@ export async function GET(request: Request) {
       include: { capabilities: true, needs: true },
     });
 
-    // If the user has built their Opportunity DNA, ensure web opportunities are synced & cached
-    if (profile) {
+    // Sync web opportunities on initial feed load (skip during active search queries so search stays fast)
+    if (profile && !q) {
       await syncOpportunitiesForDna({
         role: profile.role,
         industry: profile.industry,
@@ -47,43 +132,42 @@ export async function GET(request: Request) {
       }).catch(() => null);
     }
 
-    // Ranked full-text search when q is present (includes shared web cache where ownerId IS NULL
-    // plus the current workspace's own submissions).
-    const rows = q
-      ? await db().$queryRaw<{ id: string }[]>(Prisma.sql`
-          SELECT "id" FROM "Opportunity"
-          WHERE ("ownerId" IS NULL OR "ownerId" = ${session.id})
-            AND ("searchVector" @@ websearch_to_tsquery('english', ${q})
-              OR EXISTS (SELECT 1 FROM unnest("requirements") r WHERE r ILIKE ${'%' + q + '%'})
-              OR EXISTS (SELECT 1 FROM unnest("offers") o WHERE o ILIKE ${'%' + q + '%'})
-              OR "location" ILIKE ${'%' + q + '%'})
-          ORDER BY ts_rank("searchVector", websearch_to_tsquery('english', ${q})) DESC, "publishedAt" DESC
-          LIMIT 200`)
-      : await db().opportunity.findMany({
-          where: {
-            OR: [{ ownerId: null }, { ownerId: session.id }],
-          },
-          orderBy: { publishedAt: 'desc' },
-          take: 200,
-          select: { id: true },
-        });
-
-    const ids = rows.map((row) => row.id);
-    const listings = ids.length
-      ? await db().opportunity.findMany({ where: { id: { in: ids } } })
-      : [];
-
-    const rank = new Map(ids.map((id, index) => [id, index]));
-    listings.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
-
+    // Compute PostgreSQL full-text rank boosts when q is present
+    const ftsRanks = new Map<string, number>();
     if (q) {
-      await recordEvent(
-        session.id,
-        'opportunity.viewed',
-        `search:${q}`,
-        listings[0]?.id ?? null
-      ).catch(() => {});
+      const rankedRows = await db()
+        .$queryRaw<{ id: string; rank: number }[]>(Prisma.sql`
+          SELECT
+            "id",
+            COALESCE(
+              ts_rank(
+                COALESCE(
+                  "searchVector",
+                  to_tsvector('english', COALESCE("title", '') || ' ' || COALESCE("organization", '') || ' ' || COALESCE("description", ''))
+                ),
+                websearch_to_tsquery('english', ${q})
+              ),
+              0
+            ) AS "rank"
+          FROM "Opportunity"
+          WHERE ("ownerId" IS NULL OR "ownerId" = ${session.id})
+        `)
+        .catch(() => []);
+
+      for (const row of rankedRows) {
+        if (row.rank > 0) {
+          ftsRanks.set(row.id, Number(row.rank));
+        }
+      }
     }
+
+    const listings = await db().opportunity.findMany({
+      where: {
+        OR: [{ ownerId: null }, { ownerId: session.id }],
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: 200,
+    });
 
     // Self-heal rows stored by older versions: raw/truncated HTML descriptions and
     // non-skill "requirements" (Remote, Undergraduate, All ...).
@@ -93,15 +177,22 @@ export async function GET(request: Request) {
         row.description = truncateMarkdown(htmlToMarkdown(row.description), 3500);
         if (row.ownerId === null) {
           repairs.push(
-            db().opportunity.update({ where: { id: row.id }, data: { description: row.description } })
+            db().opportunity.update({
+              where: { id: row.id },
+              data: { description: row.description },
+            })
           );
         }
       }
       if (row.ownerId === null) {
-        row.requirements = cleanRequirements(row.requirements, { unstop: isUnstopUrl(row.sourceUrl) });
+        row.requirements = cleanRequirements(row.requirements, {
+          unstop: isUnstopUrl(row.sourceUrl),
+        });
       }
     }
     void Promise.allSettled(repairs);
+
+    const canonicalById = new Map(listings.map((item) => [item.id, item]));
 
     const now = new Date();
     const scored = listings.map((item) => ({
@@ -122,8 +213,39 @@ export async function GET(request: Request) {
       scored.sort((a, b) => (b.match?.score ?? 0) - (a.match?.score ?? 0));
     }
 
-    // Matching/ranking runs on the canonical text above; translation is display-only.
-    const { items: opportunities, pending, translation } = await localizeListings(scored, lang);
+    // Localize listings so search works across both canonical English and translated Hindi text
+    const { items: localizedItems, pending, translation } = await localizeListings(scored, lang);
+
+    let opportunities = localizedItems;
+
+    if (q) {
+      const matchedWithScore = localizedItems
+        .map((item) => {
+          const canonical = canonicalById.get(item.id) ?? item;
+          const relevance = computeSearchRelevance(
+            q,
+            canonical,
+            item,
+            ftsRanks.get(item.id) ?? 0
+          );
+          return { item, relevance };
+        })
+        .filter((entry) => entry.relevance > 0);
+
+      matchedWithScore.sort((a, b) => {
+        if (b.relevance !== a.relevance) return b.relevance - a.relevance;
+        return (b.item.match?.score ?? 0) - (a.item.match?.score ?? 0);
+      });
+
+      opportunities = matchedWithScore.map((entry) => entry.item);
+
+      await recordEvent(
+        session.id,
+        'opportunity.viewed',
+        `search:${q}`,
+        opportunities[0]?.id ?? null
+      ).catch(() => {});
+    }
 
     return { opportunities, query: q || null, lang, pending, translation };
   });

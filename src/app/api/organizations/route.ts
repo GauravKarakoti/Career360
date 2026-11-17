@@ -13,15 +13,31 @@ const createSchema = z.object({
 
 export async function GET(request: Request) {
   return handle(request, async () => {
-    const orgs = await db().organization.findMany({
-      orderBy: [{ verified: 'desc' }, { createdAt: 'desc' }],
+    const session = await workspace();
+    if (!session.accountId) {
+      return { organizations: [] };
+    }
+
+    const organizations = await db().organization.findMany({
+      where: {
+        memberships: {
+          some: { accountId: session.accountId },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
       select: {
-        id: true, name: true, slug: true, description: true, website: true,
-        verified: true, createdAt: true,
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        website: true,
+        verified: true,
+        createdAt: true,
         _count: { select: { memberships: true, documents: true } },
       },
     });
-    return { organizations: orgs };
+
+    return { organizations };
   });
 }
 
